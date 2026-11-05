@@ -1,0 +1,14 @@
+## Interface: 16001
+## Title: BuffCheck
+## Notes: Shows missing self-buffs (blessings, auras, buff food, elixirs, flasks) out of combat. Click to cast, use or craft. Settings: minimap button, /bc or Options → AddOns.
+## Notes-deDE: Zeigt fehlende Selbst-Buffs (Segen, Aura, Buff-Essen, Elixiere, Fläschchen) außerhalb des Kampfs. Klick zum Wirken, Benutzen oder Herstellen. Einstellungen: Minimap-Button, /bc oder Optionen → AddOns.
+## Author: Kai
+## Version: 1.6
+## X-License: MIT
+## IconTexture: Interface\Icons\INV_Potion_62
+## AddonCompartmentFunc: BuffCheck_OnAddonCompartmentClick
+## SavedVariables: BuffCheckDB
+
+Locale.lua
+BuffCheck.lua
+Options.lua
