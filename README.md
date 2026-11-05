@@ -8,6 +8,10 @@ It was built for a paladin alchemist, but the bag scan, food and elixir checks w
 
 ## Features
 
+![Class buffs and elixirs in one bar](screenshots/class-buffs.png)
+
+*Blessing and aura missing (first two icons), followed by elixirs from your bags.*
+
 - **Class buffs (paladin):** blessing, aura and, optionally, Righteous Fury. Click to cast. When a blessing is about to expire, the click recasts that same blessing.
 - **Buff food:** shows your buff food when "Well Fed" is missing.
 - **Buff items from your bags:** elixirs, scrolls and other consumables whose buff lasts at least 10 minutes are detected automatically from their tooltip.
