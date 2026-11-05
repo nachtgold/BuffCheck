@@ -1,6 +1,6 @@
 # BuffCheck
 
-A World of Warcraft addon for **WoW Forever** (client interface `16001`) that shows which of your self-buffs are missing, out of combat. Click an icon to cast, use or craft what's missing.
+A World of Warcraft addon for **WoW Forever** that shows which of your self-buffs are missing, out of combat. Click an icon to cast, use or craft what's missing.
 
 It was built for a paladin alchemist, but the bag scan, food and elixir checks work for any class.
 
