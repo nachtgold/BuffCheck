@@ -1020,6 +1020,31 @@ local function collectCamp(missing)
   end
 end
 
+-- Verstecktes Tooltip zum Auslesen von Buff-Texten (klassischer Weg, falls
+-- C_TooltipInfo für Auren nichts liefert)
+local scanTip
+local function scanBuffTooltip(index)
+  if not scanTip then
+    scanTip = CreateFrame("GameTooltip", "BuffCheckScanTooltip", nil, "GameTooltipTemplate")
+  end
+  scanTip:SetOwner(WorldFrame, "ANCHOR_NONE")
+  scanTip:ClearLines()
+  local ok = (scanTip.SetUnitBuff and pcall(scanTip.SetUnitBuff, scanTip, "player", index))
+    or (scanTip.SetUnitAura and pcall(scanTip.SetUnitAura, scanTip, "player", index, "HELPFUL"))
+  local out = {}
+  if ok then
+    for n = 1, (scanTip:NumLines() or 0) do
+      for _, side in ipairs({ "Left", "Right" }) do
+        local fs = _G["BuffCheckScanTooltipText" .. side .. n]
+        local t = fs and fs:GetText()
+        if type(t) == "string" and not isSecret(t) then table.insert(out, t:lower()) end
+      end
+    end
+  end
+  scanTip:Hide()
+  return out
+end
+
 -- Aktiver Lager-Buff (Camp Benefits) und der Text seines Tooltips (klein)
 local function campBuff()
   if not (C_UnitAuras and C_UnitAuras.GetAuraDataByIndex) then return nil end
@@ -1042,6 +1067,7 @@ local function campBuff()
           if type(t) == "string" and not isSecret(t) then table.insert(text, t:lower()) end
         end
       end
+      if #text == 0 then text = scanBuffTooltip(i) end
       local desc = aura.spellId and not isSecret(aura.spellId)
         and safe(C_Spell.GetSpellDescription, aura.spellId)
       if type(desc) == "string" then table.insert(text, desc:lower()) end
