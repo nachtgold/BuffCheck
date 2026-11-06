@@ -1020,47 +1020,112 @@ local function collectCamp(missing)
   end
 end
 
--- Klassenbuffs, die der aktive Lager-Buff blockiert ("Ein mächtigerer Zauber
--- ist bereits aktiv"): Objektnamen im Tooltip des Lager-Buffs suchen.
--- Liefert eine Menge (kleingeschriebene Zaubernamen -> true).
-local function campBlockedSpells()
-  local blocked = {}
-  if not (C_UnitAuras and C_UnitAuras.GetAuraDataByIndex and C_TooltipInfo) then return blocked end
+-- Aktiver Lager-Buff (Camp Benefits) und der Text seines Tooltips (klein)
+local function campBuff()
+  if not (C_UnitAuras and C_UnitAuras.GetAuraDataByIndex) then return nil end
   for i = 1, 40 do
     local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
     if not ok or not aura then break end
     if not isSecret(aura) and matchesAny(aura.name, CAMP_AURA_PATTERNS) then
-      local data = (aura.auraInstanceID and C_TooltipInfo.GetUnitBuffByAuraInstanceID
-          and safe(C_TooltipInfo.GetUnitBuffByAuraInstanceID, "player", aura.auraInstanceID))
-        or (C_TooltipInfo.GetUnitAura and safe(C_TooltipInfo.GetUnitAura, "player", i, "HELPFUL"))
       local text = {}
+      local T = C_TooltipInfo
+      local data = T and ((aura.auraInstanceID and T.GetUnitBuffByAuraInstanceID
+          and safe(T.GetUnitBuffByAuraInstanceID, "player", aura.auraInstanceID))
+        or (T.GetUnitAura and safe(T.GetUnitAura, "player", i, "HELPFUL"))
+        or (T.GetUnitBuff and safe(T.GetUnitBuff, "player", i)))
+      if data and TooltipUtil and TooltipUtil.SurfaceArgs then
+        pcall(TooltipUtil.SurfaceArgs, data)
+        for _, l in ipairs(data.lines or {}) do pcall(TooltipUtil.SurfaceArgs, l) end
+      end
       for _, l in ipairs(data and data.lines or {}) do
         for _, t in ipairs({ l.leftText, l.rightText }) do
-          if t and not isSecret(t) then table.insert(text, t:lower()) end
+          if type(t) == "string" and not isSecret(t) then table.insert(text, t:lower()) end
         end
       end
-      text = table.concat(text, "\n")
-      for _, obj in pairs(CAMP_OBJECTS) do
-        if obj.conflicts then
-          local names = {}
-          for _, n in ipairs(obj.labels or {}) do table.insert(names, n) end
-          for _, id in ipairs(obj.items) do
-            local n = safe(C_Item.GetItemNameByID, id)
-            if n then table.insert(names, n)
-            elseif C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end
-          end
-          for _, n in ipairs(names) do
-            if text:find(n:lower(), 1, true) then
-              for _, c in ipairs(obj.conflicts) do blocked[c:lower()] = true end
-              break
-            end
-          end
+      local desc = aura.spellId and not isSecret(aura.spellId)
+        and safe(C_Spell.GetSpellDescription, aura.spellId)
+      if type(desc) == "string" then table.insert(text, desc:lower()) end
+      return aura, table.concat(text, "\n")
+    end
+  end
+  return nil
+end
+
+-- Aus Fehlermeldungen gelernt: Zauber, die der Lager-Buff blockiert
+-- ("Ein mächtigerer Zauber ist bereits aktiv"). Name (klein) -> Ablaufzeit
+local learnedBlocked = {}
+
+-- Klassenbuffs, die der aktive Lager-Buff blockiert: Objektnamen im Tooltip
+-- des Lager-Buffs suchen, dazu die gelernten. Menge: Zaubername (klein) -> true
+local function campBlockedSpells()
+  local blocked = {}
+  local aura, text = campBuff()
+  if not aura then
+    wipe(learnedBlocked)
+    return blocked
+  end
+  local now = GetTime()
+  for n, untilT in pairs(learnedBlocked) do
+    if untilT > now then blocked[n] = true else learnedBlocked[n] = nil end
+  end
+  if text == "" then return blocked end
+  for _, obj in pairs(CAMP_OBJECTS) do
+    if obj.conflicts then
+      local names = {}
+      for _, n in ipairs(obj.labels or {}) do table.insert(names, n) end
+      for _, id in ipairs(obj.items) do
+        local n = safe(C_Item.GetItemNameByID, id)
+        if n then table.insert(names, n)
+        elseif C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end
+      end
+      for _, n in ipairs(names) do
+        if text:find(n:lower(), 1, true) then
+          for _, c in ipairs(obj.conflicts) do blocked[c:lower()] = true end
+          break
         end
       end
     end
   end
   return blocked
 end
+
+-- Fehlermeldung "mächtigerer Zauber aktiv" dem zuletzt versuchten Zauber zuordnen
+local lastTry = { name = nil, at = 0 }
+local lastBounce = 0
+local function isBounce(msg)
+  if type(msg) ~= "string" or isSecret(msg) then return false end
+  if SPELL_FAILED_AURA_BOUNCED and msg == SPELL_FAILED_AURA_BOUNCED then return true end
+  local m = msg:lower()
+  return m:find("more powerful", 1, true) or m:find("mächtigerer", 1, true) or false
+end
+local function learnBlock()
+  if not lastTry.name or math.abs(lastBounce - lastTry.at) > 1.5 then return end
+  local aura = campBuff()
+  if not aura then return end
+  local exp = aura.expirationTime
+  local untilT = (type(exp) == "number" and not isSecret(exp) and exp > 0) and exp or (GetTime() + 3600)
+  learnedBlocked[lastTry.name:lower()] = untilT
+  lastTry.name = nil
+  if ns.queueUpdate then ns.queueUpdate() end
+end
+local bounceWatch = CreateFrame("Frame")
+pcall(bounceWatch.RegisterEvent, bounceWatch, "UI_ERROR_MESSAGE")
+pcall(bounceWatch.RegisterUnitEvent, bounceWatch, "UNIT_SPELLCAST_FAILED", "player")
+pcall(bounceWatch.RegisterUnitEvent, bounceWatch, "UNIT_SPELLCAST_FAILED_QUIET", "player")
+bounceWatch:SetScript("OnEvent", function(_, event, a1, a2, a3)
+  if event == "UI_ERROR_MESSAGE" then
+    if isBounce(a2) or isBounce(a1) then
+      lastBounce = GetTime()
+      learnBlock()
+    end
+  else
+    local name = a3 and not isSecret(a3) and safe(C_Spell.GetSpellName, a3)
+    if name then
+      lastTry.name, lastTry.at = name, GetTime()
+      learnBlock()
+    end
+  end
+end)
 
 ------------------------------------------------------------------------
 -- Anzeige
@@ -1198,6 +1263,10 @@ local function getButton(i)
   end)
   b:SetScript("OnLeave", GameTooltip_Hide)
   b:HookScript("OnClick", function(self, mouse, down)
+    if mouse == "LeftButton" and self:GetAttribute("type1") == "spell" then
+      local sp = self:GetAttribute("spell")
+      if type(sp) == "string" then lastTry.name, lastTry.at = sp, GetTime() end
+    end
     if mouse == "RightButton" and not down and self.craftID then
       openRecipe(self.craftID)
       return
@@ -1714,6 +1783,11 @@ SlashCmdList.BUFFCHECK = function(msg)
     local near, why = nearCampfire()
     say(L["Lagerfeuer in der Nähe: %s"]:format(near and (L["ja"] .. " (" .. why .. ")") or L["nein"]))
     say(L["Rolle für Lagerobjekte: %s"]:format(ROLE_NAMES[campRole()] or campRole()))
+    local cAura, cText = campBuff()
+    if cAura then
+      say(L["Lager-Buff: %s | Tooltip: %s"]:format(cAura.name or "?",
+        (cText and cText ~= "") and cText:gsub("\n", " / ") or L["nicht lesbar"]))
+    end
     local blocked = {}
     for n in pairs(campBlockedSpells()) do table.insert(blocked, n) end
     table.sort(blocked)

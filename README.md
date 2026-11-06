@@ -28,6 +28,7 @@ It was built for a paladin alchemist, but the bag scan, food and elixir checks w
   - The tooltip lists your other options. Each object can only be placed once per camp, so if someone already placed yours, take the next one.
   - Once you've placed an object, the shared one-hour cooldown hides the suggestion.
   - While your camp buff (Camp Benefits) includes an object that blocks a class buff, that class buff isn't suggested. With a Lodestone in the camp, for example, Blessing of Might is skipped until the camp buff runs out, and another blessing you know is offered instead.
+    BuffCheck reads the camp buff's tooltip to see which objects are in the camp. If a cast still fails with "A more powerful spell is already active", it also remembers that spell as blocked until the camp buff ends. `/bc lager` shows what it read and what is blocked.
 - **Expiring buffs:** a buff shows up before it runs out (configurable, default 60 s), with a countdown on the icon.
 - **Cooldowns:** a cooldown spiral on each icon (global cooldown, item and spell cooldowns).
 - **Layout:** spacing and icons per row are adjustable, buff names under the icons are optional, and the bar can be moved.
