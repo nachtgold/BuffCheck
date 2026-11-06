@@ -39,7 +39,7 @@ It started out for a paladin alchemist and now supports all nine classes. Only t
 - **Campfires (camping):** at a campfire the bar suggests the one camp object you should place yourself.
   - The pick depends on your role, your professions and your active class buffs. A Lodestone is skipped while you have Blessing of Might, for example, because the two don't stack.
   - While levelling, the Camp Tent (rested bonus) comes first.
-  - A colored icon means the object is in your bags: click to place it. A grey icon means you'd have to craft it first.
+  - A colored icon means the object is in your bags: click to place it. A grey icon means you have to craft it first: a click opens your profession window at the recipe, crafts the object and closes the window again. Click once more to place it.
   - The tooltip lists your other options. Each object can only be placed once per camp, so if someone already placed yours, take the next one.
   - Once you've placed an object, the shared one-hour cooldown hides the suggestion.
   - While your camp buff (Camp Benefits) includes an object that blocks a class buff, that class buff isn't suggested. With a Lodestone in the camp, for example, Blessing of Might is skipped until the camp buff runs out, and another blessing you know is offered instead.

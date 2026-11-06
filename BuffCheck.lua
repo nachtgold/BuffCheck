@@ -168,35 +168,35 @@ local ANY_FLASK = { 13510, 13511, 13512, 13513, 274273, 274274, 274275, 274276 }
 -- conflicts: Klassenbuffs, mit denen die Stärkung nicht zusammen wirkt.
 ------------------------------------------------------------------------
 local CAMP_OBJECTS = {
-  alchimie = { labels = { "Manabrunnen", "Mana Well" }, names = { "alchemie", "alchemy" }, effect = L["Mana alle 5 Sek."],
+  alchimie = { line = 171, labels = { "Manabrunnen", "Mana Well" }, names = { "alchemie", "alchemy" }, effect = L["Mana alle 5 Sek."],
     items = { 279990, 279970, 279956 },
     conflicts = { "Segen der Weisheit", "Großer Segen der Weisheit", "Blessing of Wisdom", "Greater Blessing of Wisdom" } },
-  schmiede = { labels = { "Schleifstein", "Sharpening Wheel" }, names = { "schmiedekunst", "blacksmithing" }, effect = L["Stärke"],
+  schmiede = { line = 164, labels = { "Schleifstein", "Sharpening Wheel" }, names = { "schmiedekunst", "blacksmithing" }, effect = L["Stärke"],
     items = { 279955, 279988, 279944 },
     conflicts = { "Stärke der Erde", "Strength of Earth" } },
-  verzauber = { labels = { "Verzauberte Laute", "Enchanted Lute" }, names = { "verzauberkunst", "enchanting" }, effect = L["Rüstung und alle Werte"],
+  verzauber = { line = 333, labels = { "Verzauberte Laute", "Enchanted Lute" }, names = { "verzauberkunst", "enchanting" }, effect = L["Rüstung und alle Werte"],
     items = { 279987, 279985, 279976 },
     conflicts = { "Mal der Wildnis", "Gabe der Wildnis", "Mark of the Wild", "Gift of the Wild" } },
-  ingenieur = { names = { "ingenieurskunst", "engineering" }, effect = L["Reagenzien und Reparatur (kein Buff)"],
+  ingenieur = { line = 202, names = { "ingenieurskunst", "engineering" }, effect = L["Reagenzien und Reparatur (kein Buff)"],
     items = { 279989, 279949, 279950 }, noBuff = true },
-  kraeuter = { labels = { "Räucherkerze", "Incense Candle" }, names = { "kräuterkunde", "herbalism" }, effect = L["Intelligenz"],
+  kraeuter = { line = 182, labels = { "Räucherkerze", "Incense Candle" }, names = { "kräuterkunde", "herbalism" }, effect = L["Intelligenz"],
     items = { 279947, 279964, 279962 },
     conflicts = { "Arkane Intelligenz", "Arkane Brillanz", "Arcane Intellect", "Arcane Brilliance" } },
-  leder = { names = { "lederverarbeitung", "leatherworking" }, effect = L["Ruhebonus (Erfahrung)"],
+  leder = { line = 165, names = { "lederverarbeitung", "leatherworking" }, effect = L["Ruhebonus (Erfahrung)"],
     items = { 279945, 279941, 279978 } },
-  bergbau = { labels = { "Leitstein", "Lodestone" }, names = { "bergbau", "mining" }, effect = L["Angriffskraft"],
+  bergbau = { line = 186, labels = { "Leitstein", "Lodestone" }, names = { "bergbau", "mining" }, effect = L["Angriffskraft"],
     items = { 279952, 279948, 279960 },
     conflicts = { "Segen der Macht", "Großer Segen der Macht", "Blessing of Might", "Greater Blessing of Might" } },
-  kuerschner = { labels = { "Lagerstuhl", "Camp Chair" }, names = { "kürschnerei", "skinning" }, effect = L["2 % kritische Trefferchance"],
+  kuerschner = { line = 393, labels = { "Lagerstuhl", "Camp Chair" }, names = { "kürschnerei", "skinning" }, effect = L["2 % kritische Trefferchance"],
     items = { 279938, 279969, 279979 },
     conflicts = { "Aura des Moonkin", "Moonkin-Aura", "Moonkin Aura" } },
-  schneider = { labels = { "Fraktionsbanner", "Faction Banner" }, names = { "schneiderei", "tailoring" }, effect = L["Willenskraft"],
+  schneider = { line = 197, labels = { "Fraktionsbanner", "Faction Banner" }, names = { "schneiderei", "tailoring" }, effect = L["Willenskraft"],
     items = { 279959, 279943, 279972 },
     conflicts = { "Göttlicher Willen", "Gebet der Willenskraft", "Divine Spirit", "Prayer of Spirit" } },
-  erstehilfe = { labels = { "Verbandtasche", "First Aid Kit" }, names = { "erste hilfe", "first aid" }, effect = L["Ausdauer"],
+  erstehilfe = { line = 129, labels = { "Verbandtasche", "First Aid Kit" }, names = { "erste hilfe", "first aid" }, effect = L["Ausdauer"],
     items = { 279951, 279940, 279968 },
     conflicts = { "Machtwort: Seelenstärke", "Gebet der Seelenstärke", "Power Word: Fortitude", "Prayer of Fortitude" } },
-  angeln = { labels = { "Fischglas", "Fish Bowl" }, names = { "angeln", "fishing" }, effect = L["8 % auf alle Werte"],
+  angeln = { line = 356, labels = { "Fischglas", "Fish Bowl" }, names = { "angeln", "fishing" }, effect = L["8 % auf alle Werte"],
     items = { 279966, 279965, 279967 },
     conflicts = { "Segen der Könige", "Großer Segen der Könige", "Blessing of Kings", "Greater Blessing of Kings" } },
 }
@@ -496,6 +496,21 @@ local function knownRecipes()
   return BuffCheckDB.known and BuffCheckDB.known[charKey()]
 end
 
+-- Rezepte für Lagerobjekte (aus jedem Berufsfenster, wird ergänzt statt ersetzt)
+local function campRecipes()
+  BuffCheckDB.knownCamp = BuffCheckDB.knownCamp or {}
+  local k = charKey()
+  BuffCheckDB.knownCamp[k] = BuffCheckDB.knownCamp[k] or {}
+  return BuffCheckDB.knownCamp[k]
+end
+
+-- Rezept-ID zu einem Item (Alchemie oder Lagerobjekt), nil = unbekannt
+local function recipeFor(itemID)
+  local rid = (knownRecipes() or {})[itemID]
+  if rid == nil then rid = campRecipes()[itemID] end
+  return rid
+end
+
 local function itemFromLink(link)
   if type(link) ~= "string" or isSecret(link) then return nil end
   return tonumber(link:match("item:(%d+)"))
@@ -525,8 +540,29 @@ local function schematicReagents(rid)
 end
 
 local function scanRecipes()
-  local found, reagents, any = {}, {}, false
+  local found, reagents, any, campAny = {}, {}, false, false
   local T = C_TradeSkillUI
+  -- Lagerobjekte aus dem gerade offenen Berufsfenster merken
+  if T and T.GetAllRecipeIDs then
+    local camp = campRecipes()
+    for _, rid in ipairs(safe(T.GetAllRecipeIDs) or {}) do
+      local info = safe(T.GetRecipeInfo, rid)
+      if info and info.learned then
+        local sch = T.GetRecipeSchematic and safe(T.GetRecipeSchematic, rid, false)
+        local itemID = sch and sch.outputItemID
+        if not itemID and T.GetRecipeItemLink then itemID = itemFromLink(safe(T.GetRecipeItemLink, rid)) end
+        if itemID and CAMP_ITEM[itemID] then
+          camp[itemID] = rid
+          campAny = true
+          local list = schematicReagents(rid)
+          if list then
+            BuffCheckDB.reagents = BuffCheckDB.reagents or {}
+            BuffCheckDB.reagents[itemID] = list
+          end
+        end
+      end
+    end
+  end
   if T and T.GetAllRecipeIDs then
     local ids = safe(T.GetAllRecipeIDs)
     for _, rid in ipairs(ids or {}) do
@@ -576,14 +612,14 @@ local function scanRecipes()
     BuffCheckDB.reagents = BuffCheckDB.reagents or {}
     for id, list in pairs(reagents) do BuffCheckDB.reagents[id] = list end
   end
-  return any
+  return any or campAny
 end
 
 -- Zutatenliste eines Tranks (gemerkt oder live aus der Rezeptdatenbank)
 local function reagentsFor(itemID)
   local list = BuffCheckDB.reagents and BuffCheckDB.reagents[itemID]
   if list then return list end
-  local rid = (knownRecipes() or {})[itemID]
+  local rid = recipeFor(itemID)
   if type(rid) == "number" then
     list = schematicReagents(rid)
     if list then
@@ -613,29 +649,32 @@ end
 ------------------------------------------------------------------------
 local pendingCraft
 
-local function alchemyWindowOpen()
+-- Ist das Fenster dieses Berufs offen? (Standard: Alchemie)
+local function windowOpen(line)
+  line = line or ALCHEMY_SKILLLINE
   local T = C_TradeSkillUI
   if T and T.IsTradeSkillReady and not safe(T.IsTradeSkillReady) then return false end
   if T and T.GetBaseProfessionInfo then
     local info = safe(T.GetBaseProfessionInfo)
-    if info and info.professionID == ALCHEMY_SKILLLINE then return true end
+    if info and info.professionID == line then return true end
   end
   if T and T.GetTradeSkillLine then
-    if safe(T.GetTradeSkillLine) == ALCHEMY_SKILLLINE then return true end
+    if safe(T.GetTradeSkillLine) == line then return true end
   end
-  if GetTradeSkillLine then
+  if line == ALCHEMY_SKILLLINE and GetTradeSkillLine then
     local name = safe(GetTradeSkillLine)
     if type(name) == "string" and ALCHEMY_NAMES[name:lower()] then return true end
   end
   return false
 end
+local function alchemyWindowOpen() return windowOpen(ALCHEMY_SKILLLINE) end
 
 -- true = Herstellen gestartet (oder sinnvoll abgebrochen), false = ging nicht
 local function doCraft(itemID)
   local name = safe(C_Item.GetItemNameByID, itemID) or ("Item " .. itemID)
   local T = C_TradeSkillUI
-  local known = knownRecipes() or {}
-  local rid = type(known[itemID]) == "number" and known[itemID] or nil
+  local rid = recipeFor(itemID)
+  if type(rid) ~= "number" then rid = nil end
   if T and T.CraftRecipe and rid then
     local info = safe(T.GetRecipeInfo, rid)
     if info and type(info.numAvailable) == "number" and info.numAvailable < 1 then
@@ -682,23 +721,33 @@ end)
 
 -- Nur direkt aus einem Klick aufrufen: Herstellen/Fenster öffnen ist geschützt
 -- und wird blockiert, wenn es aus einem Timer oder Event heraus passiert.
-local function craftItem(itemID)
+local function noWindowMsg(line)
+  if line and line ~= ALCHEMY_SKILLLINE then
+    return L["Bitte das Berufsfenster öffnen und dann nochmal auf das Icon klicken."]
+  end
+  return L["Bitte das Alchemie-Fenster öffnen und dann nochmal auf das Icon klicken."]
+end
+
+local function craftItem(itemID, line)
   if InCombatLockdown() then return end
-  if alchemyWindowOpen() and doCraft(itemID) then
+  line = line or ALCHEMY_SKILLLINE
+  if windowOpen(line) and doCraft(itemID) then
     craftCast.closeWindow = true -- nach dem Herstellen Fenster wieder schließen
     return
   end
   local T = C_TradeSkillUI
-  local rid = (knownRecipes() or {})[itemID]
+  local rid = recipeFor(itemID)
   -- Fenster gleich beim richtigen Rezept öffnen, sonst nur das Fenster
   local opened = (T and T.OpenRecipe and type(rid) == "number" and pcall(T.OpenRecipe, rid))
-    or (T and T.OpenTradeSkill and pcall(T.OpenTradeSkill, ALCHEMY_SKILLLINE))
+    or (T and T.OpenTradeSkill and pcall(T.OpenTradeSkill, line))
   if not opened then
-    chat(L["Bitte das Alchemie-Fenster öffnen und dann nochmal auf das Icon klicken."])
+    chat(noWindowMsg(line))
     return
   end
+  -- Rezept noch nie gesehen (z. B. Lagerobjekt)? Jetzt im offenen Fenster suchen
+  if type(rid) ~= "number" and windowOpen(line) then scanRecipes() end
   -- Sind die Rezeptdaten sofort da, gleich im selben Klick herstellen
-  if alchemyWindowOpen() and doCraft(itemID) then
+  if windowOpen(line) and doCraft(itemID) then
     craftCast.closeWindow = true
     return
   end
@@ -814,18 +863,18 @@ local function collectAlchemy(missing)
 end
 
 -- Rechtsklick auf ein Craft-Icon: Alchemie-Fenster beim Rezept öffnen
-local function openRecipe(itemID)
+local function openRecipe(itemID, line)
   if InCombatLockdown() then return end
   local T = C_TradeSkillUI
-  local rid = (knownRecipes() or {})[itemID]
+  local rid = recipeFor(itemID)
   if T and T.OpenRecipe and type(rid) == "number" and pcall(T.OpenRecipe, rid) then return end
-  if T and T.OpenTradeSkill and pcall(T.OpenTradeSkill, ALCHEMY_SKILLLINE) then
+  if T and T.OpenTradeSkill and pcall(T.OpenTradeSkill, line or ALCHEMY_SKILLLINE) then
     -- alte Fenster: Rezept auswählen, sobald die Liste da ist
     local idx = tradeIndexOf[itemID]
     if idx and SelectTradeSkill then C_Timer.After(0.2, function() pcall(SelectTradeSkill, idx) end) end
     return
   end
-  chat(L["Bitte das Alchemie-Fenster öffnen und dann nochmal auf das Icon klicken."])
+  chat(noWindowMsg(line))
 end
 
 ------------------------------------------------------------------------
@@ -1004,9 +1053,16 @@ local function collectCamp(missing)
       hint = L["Am Lagerfeuer aufstellen: %s"]:format(campItemName(pick.have)), extra = extra,
     })
   else
-    local id = pick.obj.items[#pick.obj.items] -- Stufe 1, gleiche Stärkung
+    -- Beste Stufe, deren Rezept du kennst; sonst Stufe 1 (gleiche Stärkung)
+    local id = pick.obj.items[#pick.obj.items]
+    for _, tid in ipairs(pick.obj.items) do
+      if recipeFor(tid) then id = tid break end
+    end
+    -- Klick: Berufsfenster öffnen, herstellen, Fenster schließen (wie Alchemie)
     table.insert(missing, {
-      text = L["Lager"], icon = safe(C_Item.GetItemIconByID, id), info = true,
+      text = L["Lager"], icon = safe(C_Item.GetItemIconByID, id),
+      craft = true, craftID = id, craftLine = pick.obj.line,
+      craftCount = craftCount(id),
       hint = L["Herstellen und aufstellen: %s (nicht in der Tasche)"]:format(campItemName(id)), extra = extra,
     })
   end
@@ -1270,9 +1326,9 @@ local function getButton(i)
       if self.noReagents then
         GameTooltip:AddLine(L["Zutaten fehlen – Herstellen nicht möglich"], 1, 0.25, 0.25)
       else
-        GameTooltip:AddLine(L["Linksklick: herstellen (danach nochmal klicken zum Trinken)"], 1, 1, 1)
+        GameTooltip:AddLine(self.craftLine and L["Linksklick: herstellen (danach nochmal klicken zum Aufstellen)"] or L["Linksklick: herstellen (danach nochmal klicken zum Trinken)"], 1, 1, 1)
       end
-      GameTooltip:AddLine(L["Rechtsklick: Rezept im Alchemie-Fenster öffnen"], 0.7, 0.7, 0.7)
+      GameTooltip:AddLine(self.craftLine and L["Rechtsklick: Rezept im Berufsfenster öffnen"] or L["Rechtsklick: Rezept im Alchemie-Fenster öffnen"], 0.7, 0.7, 0.7)
     elseif not self.info then
       GameTooltip:AddLine(L["Linksklick: wirken / benutzen"], 1, 1, 1)
     end
@@ -1286,7 +1342,7 @@ local function getButton(i)
       if type(sp) == "string" then lastTry.name, lastTry.at = sp, GetTime() end
     end
     if mouse == "RightButton" and not down and self.craftID then
-      openRecipe(self.craftID)
+      openRecipe(self.craftID, self.craftLine)
       return
     end
     if mouse == "LeftButton" and self.craftID and self.noReagents then
@@ -1314,7 +1370,7 @@ local function getButton(i)
       return
     end
     if mouse == "LeftButton" and not down and self.craftID then
-      craftItem(self.craftID)
+      craftItem(self.craftID, self.craftLine)
       return
     end
     if mouse == "RightButton" and not down and self.itemID and not InCombatLockdown() then
@@ -1667,6 +1723,7 @@ local function update()
     b.info = m.info
     b.craft = m.craft
     b.craftID = m.craftID
+    b.craftLine = m.craftLine
     b.itemID = m.itemID
     b.betterID = m.betterID
     b.weak:SetShown(m.betterID and true or false)
