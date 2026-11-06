@@ -13,6 +13,7 @@ It was built for a paladin alchemist, but the bag scan, food and elixir checks w
 *Blessing and aura missing (first two icons), followed by elixirs from your bags.*
 
 - **Class buffs (paladin):** blessing, aura and, optionally, Righteous Fury. Click to cast. When a blessing is about to expire, the click recasts that same blessing.
+- **Gathering tracking:** Find Herbs or Find Minerals, only if your character has Herbalism or Mining. Click to turn tracking on.
 - **Buff food:** shows your buff food when "Well Fed" is missing.
 - **Buff items from your bags:** elixirs, scrolls and other consumables whose buff lasts at least 10 minutes are detected automatically from their tooltip.
 - **Alchemy:** elixirs and flasks you can craft count as "needed" for your role (all, auto by talent tree, healer, tank, damage).

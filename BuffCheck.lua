@@ -44,6 +44,17 @@ local GROUPS = {
     key = "zorn", label = L["Zorn d. Gerechtigkeit"], defaultOff = true,
     spells = { "Zorn der Gerechtigkeit", "Righteous Fury" },
   },
+  {
+    -- Sammelberufe: nur eine Suche kann aktiv sein; nur mit dem passenden Beruf
+    key = "suche", label = L["Suche (Sammelberuf)"],
+    spells = { "Kräutersuche", "Find Herbs", "Mineraliensuche", "Find Minerals" },
+    prof = {
+      ["Kräutersuche"] = { "kräuterkunde", "herbalism" },
+      ["Find Herbs"] = { "kräuterkunde", "herbalism" },
+      ["Mineraliensuche"] = { "bergbau", "mining" },
+      ["Find Minerals"] = { "bergbau", "mining" },
+    },
+  },
 }
 
 -- Name des Essens-Buffs (deutsch / englisch)
@@ -1448,6 +1459,12 @@ local function collectMissing()
 
   -- Klassenbuffs (ohne die, die ein aktiver Lager-Buff blockiert)
   local campBlocked = campBlockedSpells()
+  local profs -- erst bei Bedarf ermitteln
+  local function hasProf(names)
+    profs = profs or professionSkills()
+    for _, n in ipairs(names) do if profs[n] then return true end end
+    return false
+  end
   for _, g in ipairs(GROUPS) do
     if BuffCheckDB.enabled[g.key] then
       local castInfo, unreadable, active, expiring = nil, false, false, nil
@@ -1455,7 +1472,9 @@ local function collectMissing()
         local state, rem = hasBuff(name)
         if state == nil then unreadable = true end
         if state then active = true break end
-        if not campBlocked[name:lower()] then
+        -- Zauber, die einen Beruf brauchen, nur vorschlagen, wenn du ihn hast
+        local profOK = not (g.prof and g.prof[name]) or hasProf(g.prof[name])
+        if profOK and not campBlocked[name:lower()] then
           if rem then
             -- Läuft ab: genau diesen Buff erneuern, wenn du ihn kennst
             expiring = math.max(expiring or 0, rem)

@@ -9,6 +9,7 @@ local EN = {
   ["Segen"] = "Blessing",
   ["Aura"] = "Aura",
   ["Zorn d. Gerechtigkeit"] = "Righteous Fury",
+  ["Suche (Sammelberuf)"] = "Tracking (gathering)",
   ["Essen"] = "Food",
   ["Fläschchen"] = "Flask",
   ["Fläschchen (Weisheit)"] = "Flask (Wisdom)",

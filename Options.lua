@@ -223,7 +223,7 @@ local function buildContent(f)
     checkbox(f, cx, Y - 322, g.label,
       function() return BuffCheckDB.enabled[key] end,
       function(v) BuffCheckDB.enabled[key] = v end)
-    cx = cx + 160
+    cx = cx + 135
   end
 
   -- Verbrauchsgüter ----------------------------------------------------
