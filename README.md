@@ -21,6 +21,12 @@ It was built for a paladin alchemist, but the bag scan, food and elixir checks w
   - The number in the corner shows how many you can craft with the reagents you have. The icon turns **red at 0**.
   - Optionally a weaker recipe you have reagents for is offered instead (yellow border with a down arrow), and the tooltip lists what the better recipe is missing.
   - Right-click opens the recipe in the Alchemy window.
+- **Campfires (camping):** at a campfire the bar suggests the one camp object you should place yourself.
+  - The pick depends on your role, your professions and your active class buffs. A Lodestone is skipped while you have Blessing of Might, for example, because the two don't stack.
+  - While levelling, the Camp Tent (rested bonus) comes first.
+  - A colored icon means the object is in your bags: click to place it. A grey icon means you'd have to craft it first.
+  - The tooltip lists your other options. Each object can only be placed once per camp, so if someone already placed yours, take the next one.
+  - Once you've placed an object, the shared one-hour cooldown hides the suggestion.
 - **Expiring buffs:** a buff shows up before it runs out (configurable, default 60 s), with a countdown on the icon.
 - **Cooldowns:** a cooldown spiral on each icon (global cooldown, item and spell cooldowns).
 - **Layout:** spacing and icons per row are adjustable, buff names under the icons are optional, and the bar can be moved.
@@ -51,6 +57,7 @@ Chat commands:
 | `/bc food [link]` | Set your preferred buff food |
 | `/bc item [link]` | Always watch this item |
 | `/bc ignore [link]` | Ignore an item (right-clicking an icon does the same) |
+| `/bc lager` | Show campfire detection and camp object suggestions |
 | `/bc debug` | Print diagnostics to chat |
 
 ## Installation
@@ -62,6 +69,7 @@ Copy the `BuffCheck` folder to `World of Warcraft/_forever_/Interface/AddOns/` a
 - The bar is hidden in combat. Addons can't change click-to-cast buttons during combat, and buff data is partly restricted there.
 - WoW Forever doesn't let addon buttons cast recipes as spells. Crafting therefore goes through the Alchemy window, which the addon opens and closes for you.
 - Drinking a crafted potion still needs your own click, because Blizzard only allows items to be used from a hardware click.
+- Addons can't see campfires directly. BuffCheck detects one by a campfire buff on you, or by a campfire placed by you or your group within 15 yards. A fire placed by a stranger is only noticed once its buff reaches you. `/bc lager` shows what was detected.
 - Recipe data (skill levels, durations, effects) comes from Wowhead's WoW Forever database as of November 2026.
 
 ---
@@ -73,6 +81,7 @@ BuffCheck zeigt außerhalb des Kampfs, welche Selbst-Buffs dir fehlen: Segen, Au
 - **Graues Icon:** erst herstellen. Ein Klick stellt den Trank über das Alchemie-Fenster her.
 - **Farbiges Icon:** benutzen.
 - **Zahl in der Ecke:** wie oft deine Zutaten reichen. Bei 0 ist das Icon rot.
+- **Lagerfeuer:** Am Feuer schlägt BuffCheck das Lagerobjekt vor, das du selbst aufstellen solltest, passend zu Rolle, Berufen und aktiven Klassenbuffs. Prüfen mit `/bc lager`.
 
 Einstellungen findest du unter **Optionen → AddOns → BuffCheck**, über den Minimap-Button oder mit `/bc`.
 

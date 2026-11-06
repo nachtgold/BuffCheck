@@ -165,6 +165,72 @@ end
 local ANY_FLASK = { 13510, 13511, 13512, 13513, 274273, 274274, 274275, 274276 }
 
 ------------------------------------------------------------------------
+-- Lagerfeuer (Camping): Am Feuer stellt jeder Spieler EIN Lagerobjekt seines
+-- Berufs dazu (alle Objekte teilen 1 Std. Abklingzeit). Nach einer Minute am
+-- Feuer gibt es die Stärkungen aller Objekte als einen Buff. Daten:
+-- wowhead.com/forever (Stand 06.11.2026). items: bestes zuerst (Stufe 3, 2, 1),
+-- Stufe 2/3 geben dieselbe Stärkung wie Stufe 1 plus Extras.
+-- conflicts: Klassenbuffs, mit denen die Stärkung nicht zusammen wirkt.
+------------------------------------------------------------------------
+local CAMP_OBJECTS = {
+  alchimie = { names = { "alchemie", "alchemy" }, effect = L["Mana alle 5 Sek."],
+    items = { 279990, 279970, 279956 },
+    conflicts = { "Segen der Weisheit", "Großer Segen der Weisheit", "Blessing of Wisdom", "Greater Blessing of Wisdom" } },
+  schmiede = { names = { "schmiedekunst", "blacksmithing" }, effect = L["Stärke"],
+    items = { 279955, 279988, 279944 },
+    conflicts = { "Stärke der Erde", "Strength of Earth" } },
+  verzauber = { names = { "verzauberkunst", "enchanting" }, effect = L["Rüstung und alle Werte"],
+    items = { 279987, 279985, 279976 },
+    conflicts = { "Mal der Wildnis", "Gabe der Wildnis", "Mark of the Wild", "Gift of the Wild" } },
+  ingenieur = { names = { "ingenieurskunst", "engineering" }, effect = L["Reagenzien und Reparatur (kein Buff)"],
+    items = { 279989, 279949, 279950 }, noBuff = true },
+  kraeuter = { names = { "kräuterkunde", "herbalism" }, effect = L["Intelligenz"],
+    items = { 279947, 279964, 279962 },
+    conflicts = { "Arkane Intelligenz", "Arkane Brillanz", "Arcane Intellect", "Arcane Brilliance" } },
+  leder = { names = { "lederverarbeitung", "leatherworking" }, effect = L["Ruhebonus (Erfahrung)"],
+    items = { 279945, 279941, 279978 } },
+  bergbau = { names = { "bergbau", "mining" }, effect = L["Angriffskraft"],
+    items = { 279952, 279948, 279960 },
+    conflicts = { "Segen der Macht", "Großer Segen der Macht", "Blessing of Might", "Greater Blessing of Might" } },
+  kuerschner = { names = { "kürschnerei", "skinning" }, effect = L["2 % kritische Trefferchance"],
+    items = { 279938, 279969, 279979 },
+    conflicts = { "Aura des Moonkin", "Moonkin-Aura", "Moonkin Aura" } },
+  schneider = { names = { "schneiderei", "tailoring" }, effect = L["Willenskraft"],
+    items = { 279959, 279943, 279972 },
+    conflicts = { "Göttlicher Willen", "Gebet der Willenskraft", "Divine Spirit", "Prayer of Spirit" } },
+  erstehilfe = { names = { "erste hilfe", "first aid" }, effect = L["Ausdauer"],
+    items = { 279951, 279940, 279968 },
+    conflicts = { "Machtwort: Seelenstärke", "Gebet der Seelenstärke", "Power Word: Fortitude", "Prayer of Fortitude" } },
+  angeln = { names = { "angeln", "fishing" }, effect = L["8 % auf alle Werte"],
+    items = { 279966, 279965, 279967 },
+    conflicts = { "Segen der Könige", "Großer Segen der Könige", "Blessing of Kings", "Greater Blessing of Kings" } },
+}
+local CAMP_TIER1_SKILL = 20
+
+-- Reihenfolge: welches Objekt der Gruppe am meisten bringt
+local CAMP_PRIORITY = {
+  heal = { "alchimie", "kraeuter", "angeln", "verzauber", "schneider", "erstehilfe",
+           "leder", "kuerschner", "bergbau", "schmiede", "ingenieur" },
+  tank = { "erstehilfe", "angeln", "verzauber", "schmiede", "bergbau", "kuerschner",
+           "leder", "alchimie", "kraeuter", "schneider", "ingenieur" },
+  dd   = { "bergbau", "kuerschner", "angeln", "schmiede", "verzauber", "erstehilfe",
+           "leder", "alchimie", "kraeuter", "schneider", "ingenieur" },
+}
+local CASTER_CLASSES = { PRIEST = "heal", MAGE = "heal", WARLOCK = "heal", DRUID = "heal", SHAMAN = "heal" }
+
+-- Lagerfeuer-Sets (werden nicht als Buff-Item behandelt)
+local CAMP_KITS = { 279981, 279961, 279974 }
+local CAMP_ITEM = {}
+for _, o in pairs(CAMP_OBJECTS) do for _, id in ipairs(o.items) do CAMP_ITEM[id] = true end end
+for _, id in ipairs(CAMP_KITS) do CAMP_ITEM[id] = true end
+
+-- Woran ein Lagerfeuer in der Nähe erkannt wird
+local CAMP_AURA_PATTERNS = { "lagerfeuer", "campfire", "lager", "camp" }
+local CAMP_SPELL_PATTERNS = { "lagerfeuer", "campfire" }
+local CAMP_RANGE = 15         -- Meter um ein beobachtetes Feuer
+local CAMP_FIRE_LIFETIME = 1800 -- so lange gilt ein beobachtetes Feuer als vorhanden
+
+------------------------------------------------------------------------
 -- Hilfsfunktionen (alles defensiv: geheime Werte & fehlende APIs abfangen)
 ------------------------------------------------------------------------
 local function isSecret(v)
@@ -352,9 +418,9 @@ end
 
 local ROLE_BY_TAB = { "heal", "tank", "dd" } -- Paladin: Heilig, Schutz, Vergeltung
 
-local function currentRole()
+local function currentRole(forceAuto)
   local r = BuffCheckDB.role
-  if r and r ~= "auto" and ROLE_SLOTS[r] then return r end
+  if not forceAuto and r and r ~= "auto" and ROLE_SLOTS[r] then return r end
   local _, class = UnitClass("player")
   if class ~= "PALADIN" then return "dd" end
   if GetSpecialization then
@@ -736,6 +802,212 @@ local function openRecipe(itemID)
 end
 
 ------------------------------------------------------------------------
+-- Lagerfeuer
+------------------------------------------------------------------------
+-- Alle Berufe (auch Nebenberufe) mit Skill: kleingeschriebener Name -> Rang
+local function professionSkills()
+  local out = {}
+  if GetProfessions and GetProfessionInfo then
+    local profs = { pcall(GetProfessions) }
+    if profs[1] then
+      for i = 2, 7 do
+        local idx = profs[i]
+        if idx and not isSecret(idx) then
+          local name, _, rank = safe(GetProfessionInfo, idx)
+          if name and rank then out[name:lower()] = rank end
+        end
+      end
+    end
+  end
+  if GetNumSkillLines and GetSkillLineInfo then
+    for i = 1, (safe(GetNumSkillLines) or 0) do
+      local name, isHeader, _, rank = safe(GetSkillLineInfo, i)
+      if name and not isHeader and rank then out[name:lower()] = rank end
+    end
+  end
+  return out
+end
+
+local function campSkill(obj, skills)
+  for _, n in ipairs(obj.names) do
+    if skills[n] then return skills[n] end
+  end
+  return 0
+end
+
+-- Beobachtete Lagerfeuer (eigene oder von Gruppenmitgliedern aufgestellt)
+local campFires = {}
+
+local function unitPos(unit)
+  if not UnitPosition then return nil end
+  local y, x, _, inst = safe(UnitPosition, unit)
+  if type(x) ~= "number" or type(y) ~= "number" then return nil end
+  return x, y, inst
+end
+
+local function matchesAny(text, patterns)
+  if not text or isSecret(text) then return false end
+  text = text:lower()
+  for _, p in ipairs(patterns) do
+    if text:find(p, 1, true) then return true end
+  end
+  return false
+end
+
+local fireWatch = CreateFrame("Frame")
+pcall(fireWatch.RegisterEvent, fireWatch, "UNIT_SPELLCAST_SUCCEEDED")
+fireWatch:SetScript("OnEvent", function(_, _, unit, _, spellID)
+  if isSecret(spellID) or isSecret(unit) then return end
+  local name = spellID and safe(C_Spell.GetSpellName, spellID)
+  if not matchesAny(name, CAMP_SPELL_PATTERNS) then return end
+  local x, y, inst = unitPos(unit)
+  if not x then return end
+  table.insert(campFires, { x = x, y = y, inst = inst, t = GetTime() })
+  if ns.queueUpdate then ns.queueUpdate() end
+end)
+
+-- Aura am Spieler, die nach Lagerfeuer aussieht (frisch oder ohne Laufzeit)
+local function campAura()
+  if not (C_UnitAuras and C_UnitAuras.GetAuraDataByIndex) then return nil end
+  for i = 1, 40 do
+    local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
+    if not ok or not aura then break end
+    if not isSecret(aura) and matchesAny(aura.name, CAMP_AURA_PATTERNS) then
+      local dur, exp = aura.duration, aura.expirationTime
+      if isSecret(dur) or isSecret(exp) then return aura.name end
+      -- Ohne Laufzeit = Gebiets-Aura des Feuers; sonst nur in den ersten 2 Min.
+      -- (der fertige Lager-Buff hält 1 Std. und wirkt auch fern vom Feuer)
+      if not dur or dur == 0 or (exp - dur) > GetTime() - 120 then return aura.name end
+    end
+  end
+  return nil
+end
+
+-- Bist du an einem Lagerfeuer? Liefert eine Begründung (für /bc lager)
+local function nearCampfire()
+  local aura = campAura()
+  if aura then return true, L["Buff: %s"]:format(aura) end
+  local x, y, inst = unitPos("player")
+  local now = GetTime()
+  for i = #campFires, 1, -1 do
+    local f = campFires[i]
+    if now - f.t > CAMP_FIRE_LIFETIME then
+      table.remove(campFires, i)
+    elseif x and f.inst == inst then
+      local d = math.sqrt((x - f.x) ^ 2 + (y - f.y) ^ 2)
+      if d <= CAMP_RANGE then return true, L["Feuer in %d m"]:format(d) end
+    end
+  end
+  return false
+end
+
+local function campRole()
+  local role = currentRole()
+  if CAMP_PRIORITY[role] then return role end
+  local _, class = UnitClass("player")
+  if class == "PALADIN" then
+    role = currentRole(true)
+    if CAMP_PRIORITY[role] then return role end
+  end
+  return CASTER_CLASSES[class] or "dd"
+end
+
+-- Ist die gemeinsame Abklingzeit der Lagerobjekte aktiv (schon eins aufgestellt)?
+local function campOnCooldown(id)
+  local getCD = (C_Container and C_Container.GetItemCooldown) or GetItemCooldown
+  local start, dur = safe(getCD, id)
+  return type(start) == "number" and type(dur) == "number" and start > 0 and dur > 2
+end
+
+-- Bewertet jedes Lagerobjekt, das du aufstellen oder herstellen könntest
+local function campCandidates()
+  local skills = professionSkills()
+  local level = UnitLevel("player")
+  local maxLevel = (GetMaxPlayerLevel and safe(GetMaxPlayerLevel)) or 60
+  local order = CAMP_PRIORITY[campRole()]
+  if level < maxLevel then
+    -- Beim Leveln bringt das Lagerzelt (Ruhebonus) am meisten
+    local o = { "leder" }
+    for _, k in ipairs(order) do if k ~= "leder" then table.insert(o, k) end end
+    order = o
+  end
+  local list = {}
+  for _, key in ipairs(order) do
+    local obj = CAMP_OBJECTS[key]
+    local have
+    for _, id in ipairs(obj.items) do
+      if inBags(id) then have = id break end
+    end
+    local skill = campSkill(obj, skills)
+    if have or skill >= CAMP_TIER1_SKILL then
+      local blockedBy
+      for _, n in ipairs(obj.conflicts or {}) do
+        if hasBuff(n) then blockedBy = n break end
+      end
+      table.insert(list, { key = key, obj = obj, have = have, skill = skill, blockedBy = blockedBy })
+    end
+  end
+  return list
+end
+
+local function campItemName(id)
+  return safe(C_Item.GetItemNameByID, id) or ("Item " .. id)
+end
+
+local function collectCamp(missing)
+  if not nearCampfire() then return end
+  local list = campCandidates()
+  if #list == 0 then return end
+  -- Schon ein Objekt aufgestellt? Dann ist die gemeinsame Abklingzeit aktiv.
+  for _, c in ipairs(list) do
+    if campOnCooldown(c.have or c.obj.items[#c.obj.items]) then return end
+  end
+  -- Bestes Objekt: vorrätig und nicht durch einen Klassenbuff wirkungslos
+  local pick
+  for _, c in ipairs(list) do
+    if c.have and not c.blockedBy then pick = c break end
+  end
+  for _, c in ipairs(list) do
+    if not pick and not c.blockedBy then pick = c end
+  end
+  pick = pick or list[1]
+
+  local extra = {}
+  table.insert(extra, { L["Bringt: %s"]:format(pick.obj.effect), 1, 1, 1 })
+  if pick.blockedBy then
+    table.insert(extra, { L["Wirkt nicht zusammen mit %s (aktiv)"]:format(pick.blockedBy), 1, 0.25, 0.25 })
+  end
+  if #list > 1 then
+    table.insert(extra, { " " })
+    table.insert(extra, { L["Weitere Möglichkeiten:"] })
+    for _, c in ipairs(list) do
+      if c ~= pick then
+        local id = c.have or c.obj.items[#c.obj.items]
+        local state = c.blockedBy and L["wirkt nicht mit %s"]:format(c.blockedBy)
+          or (c.have and L["in der Tasche"]) or L["herstellen"]
+        table.insert(extra, { ("  %s – %s (%s)"):format(campItemName(id), c.obj.effect, state), 0.8, 0.8, 0.8 })
+      end
+    end
+  end
+  table.insert(extra, { " " })
+  table.insert(extra, { L["Jedes Objekt gibt es nur einmal pro Lager. Steht deins schon, nimm das nächste."], 0.7, 0.7, 0.7 })
+
+  if pick.have then
+    table.insert(missing, {
+      text = L["Lager"], icon = safe(C_Item.GetItemIconByID, pick.have),
+      type = "item", value = "item:" .. pick.have, itemID = pick.have,
+      hint = L["Am Lagerfeuer aufstellen: %s"]:format(campItemName(pick.have)), extra = extra,
+    })
+  else
+    local id = pick.obj.items[#pick.obj.items] -- Stufe 1, gleiche Stärkung
+    table.insert(missing, {
+      text = L["Lager"], icon = safe(C_Item.GetItemIconByID, id), info = true,
+      hint = L["Herstellen und aufstellen: %s (nicht in der Tasche)"]:format(campItemName(id)), extra = extra,
+    })
+  end
+end
+
+------------------------------------------------------------------------
 -- Anzeige
 ------------------------------------------------------------------------
 -- Der Anker ist ein schmaler Griff LINKS neben den Icons, damit /bc move
@@ -827,6 +1099,9 @@ local function getButton(i)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:AddLine(L["Fehlt: %s"]:format(self.text or "?"))
     if self.hint then GameTooltip:AddLine(self.hint, 1, 0.82, 0, true) end
+    for _, l in ipairs(self.extra or {}) do
+      GameTooltip:AddLine(l[1], l[2] or 1, l[3] or 0.82, l[4] or 0, true)
+    end
     if self.betterID then
       -- Warum nur der Ersatz? Fehlende Zutaten des besseren Rezepts auflisten
       GameTooltip:AddLine(" ")
@@ -860,7 +1135,7 @@ local function getButton(i)
         GameTooltip:AddLine(L["Linksklick: herstellen (danach nochmal klicken zum Trinken)"], 1, 1, 1)
       end
       GameTooltip:AddLine(L["Rechtsklick: Rezept im Alchemie-Fenster öffnen"], 0.7, 0.7, 0.7)
-    else
+    elseif not self.info then
       GameTooltip:AddLine(L["Linksklick: wirken / benutzen"], 1, 1, 1)
     end
     if self.itemID then GameTooltip:AddLine(L["Rechtsklick: Item ignorieren"], 0.7, 0.7, 0.7) end
@@ -1027,6 +1302,8 @@ local function collectMissing()
   local handled = {}
   if BuffCheckDB.enabled.alchemie then handled = collectAlchemy(missing) end
 
+  if BuffCheckDB.enabled.lager then collectCamp(missing) end
+
   local foods, buffs = scanBags()
 
   -- Buff-Essen: ein Icon, wenn "Satt" fehlt und Buff-Essen in der Tasche ist
@@ -1050,7 +1327,7 @@ local function collectMissing()
     local seenBuff = {}
     for _, id in ipairs(sorted) do
       local buff = safe(C_Item.GetItemSpell, id)
-      if buff and not seenBuff[buff] and not handled[id] then
+      if buff and not seenBuff[buff] and not handled[id] and not CAMP_ITEM[id] then
         seenBuff[buff] = true -- gleiche Wirkung (z. B. zwei Ränge) nur einmal zeigen
         local s, rem = hasBuff(buff)
         if s == false then
@@ -1087,8 +1364,8 @@ local function update()
     b.label:SetText(m.text)
     b.label:SetWidth(ICON_SIZE + math.max(gap, 4))
     b.label:SetShown(labels and true or false)
-    b.icon:SetDesaturated(m.craft and true or false)
-    b.icon:SetAlpha(m.craft and 0.6 or 1)
+    b.icon:SetDesaturated((m.craft or m.info) and true or false)
+    b.icon:SetAlpha((m.craft or m.info) and 0.6 or 1)
     b.craftText:SetShown(BuffCheckDB.showCraftText and (m.craft or m.fresh) and true or false)
     b.glow:Hide() -- kein grüner Rahmen mehr: farbiges Icon = nutzbar
     b.expiresAt = m.expiring and (GetTime() + m.expiring) or nil
@@ -1099,13 +1376,15 @@ local function update()
       b.craftText:SetText(L["craften"])
       b.craftText:SetTextColor(1, 0.5, 0.1)
     end
-    if m.craft then
+    if m.craft or m.info then
       b.label:SetTextColor(1, 0.5, 0.1)          -- orange = erst herstellen
     else
       b.label:SetTextColor(1, 0.82, 0)           -- normal gelb
     end
     b.text = m.text
     b.hint = m.hint
+    b.extra = m.extra
+    b.info = m.info
     b.craft = m.craft
     b.craftID = m.craftID
     b.itemID = m.itemID
@@ -1188,7 +1467,7 @@ for _, e in ipairs({ "SKILL_LINES_CHANGED", "CHARACTER_POINTS_CHANGED",
   pcall(ev.RegisterEvent, ev, e)
 end
 
-local GROUP_DEFAULTS = { essen = true, elixier = true, alchemie = true }
+local GROUP_DEFAULTS = { essen = true, elixier = true, alchemie = true, lager = true }
 
 ev:SetScript("OnEvent", function(_, event, arg1)
   if event == "ADDON_LOADED" then
@@ -1319,7 +1598,7 @@ SlashCmdList.BUFFCHECK = function(msg)
     queueUpdate()
   elseif cmd == "toggle" then
     local key = rest:lower()
-    if BuffCheckDB.enabled[key] == nil then return say("Gruppen: segen, aura, zorn, essen, elixier, alchemie") end
+    if BuffCheckDB.enabled[key] == nil then return say("Gruppen: segen, aura, zorn, essen, elixier, alchemie, lager") end
     BuffCheckDB.enabled[key] = not BuffCheckDB.enabled[key]
     say(key .. ": " .. (BuffCheckDB.enabled[key] and L["an"] or L["aus"]))
     queueUpdate()
@@ -1372,6 +1651,29 @@ SlashCmdList.BUFFCHECK = function(msg)
       end
     end
     if not any then say("Keine Craft-Icons sichtbar.") end
+  elseif cmd == "lager" or cmd == "camp" then
+    -- Zeigt, ob ein Lagerfeuer erkannt wird und welches Objekt vorgeschlagen wird
+    local near, why = nearCampfire()
+    say(L["Lagerfeuer in der Nähe: %s"]:format(near and (L["ja"] .. " (" .. why .. ")") or L["nein"]))
+    say(L["Rolle für Lagerobjekte: %s"]:format(ROLE_NAMES[campRole()] or campRole()))
+    local list = campCandidates()
+    if #list == 0 then say(L["Kein Lagerobjekt in der Tasche und kein passender Beruf."]) end
+    for _, c in ipairs(list) do
+      local id = c.have or c.obj.items[#c.obj.items]
+      say(("  %s – %s | %s%s%s"):format(campItemName(id), c.obj.effect,
+        c.have and L["in der Tasche"] or L["herstellen"],
+        c.skill > 0 and (" | Skill " .. c.skill) or "",
+        c.blockedBy and (" | " .. L["wirkt nicht mit %s"]:format(c.blockedBy)) or ""))
+    end
+    local auras = {}
+    for i = 1, 40 do
+      local ok, a = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
+      if not ok or not a then break end
+      if not isSecret(a) and a.name and not isSecret(a.name) then
+        table.insert(auras, a.name .. (a.spellId and not isSecret(a.spellId) and (" #" .. a.spellId) or ""))
+      end
+    end
+    say(L["Deine Buffs: %s"]:format(#auras > 0 and table.concat(auras, ", ") or "-"))
   elseif cmd == "debug" then
     local skill = alchemySkill()
     local role = currentRole()
@@ -1414,6 +1716,6 @@ SlashCmdList.BUFFCHECK = function(msg)
     for id in pairs(buffs) do say("Buff-Item: " .. (safe(C_Item.GetItemNameByID, id) or id)) end
   else
     say(L["/bc öffnet die Optionen (auch über den Minimap-Button)."])
-    say(L["Weitere: /bc move | minimap | food [Link] | item [Link] | ignore [Link] | debug"])
+    say(L["Weitere: /bc move | minimap | food [Link] | item [Link] | ignore [Link] | lager | debug"])
   end
 end

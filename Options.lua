@@ -232,6 +232,10 @@ local function buildContent(f)
     function() return BuffCheckDB.enabled.essen end,
     function(v) BuffCheckDB.enabled.essen = v end,
     L["Zeigt dein Buff-Essen, wenn \"Satt\" fehlt. Bevorzugtes Essen: /bc food [Link]"])
+  checkbox(f, 300, Y - 382, L["Lagerfeuer"],
+    function() return BuffCheckDB.enabled.lager end,
+    function(v) BuffCheckDB.enabled.lager = v end,
+    L["Am Lagerfeuer: schlägt das Lagerobjekt vor, das du selbst aufstellen solltest (nach Rolle, Beruf und Klassenbuffs). Prüfen: /bc lager"])
   checkbox(f, 20, Y - 406, L["Sonstige Buff-Items aus den Taschen"],
     function() return BuffCheckDB.enabled.elixier end,
     function(v) BuffCheckDB.enabled.elixier = v end,
