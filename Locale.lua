@@ -174,6 +174,7 @@ local EN = {
   ["Rolle für Lagerobjekte: %s"] = "Role for camp objects: %s",
   ["Kein Lagerobjekt in der Tasche und kein passender Beruf."] = "No camp object in bags and no matching profession.",
   ["Deine Buffs: %s"] = "Your buffs: %s",
+  ["Vom Lager-Buff blockiert: %s"] = "Blocked by camp buff: %s",
   ["Am Lagerfeuer: schlägt das Lagerobjekt vor, das du selbst aufstellen solltest (nach Rolle, Beruf und Klassenbuffs). Prüfen: /bc lager"] = "At a campfire: suggests the camp object you should place yourself (by role, profession and class buffs). Check: /bc lager",
 
   -- Minimap

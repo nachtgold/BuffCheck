@@ -170,38 +170,39 @@ local ANY_FLASK = { 13510, 13511, 13512, 13513, 274273, 274274, 274275, 274276 }
 -- Feuer gibt es die Stärkungen aller Objekte als einen Buff. Daten:
 -- wowhead.com/forever (Stand 06.11.2026). items: bestes zuerst (Stufe 3, 2, 1),
 -- Stufe 2/3 geben dieselbe Stärkung wie Stufe 1 plus Extras.
+-- labels: Objektnamen, wie sie im Tooltip des Lager-Buffs stehen (Stufe 1).
 -- conflicts: Klassenbuffs, mit denen die Stärkung nicht zusammen wirkt.
 ------------------------------------------------------------------------
 local CAMP_OBJECTS = {
-  alchimie = { names = { "alchemie", "alchemy" }, effect = L["Mana alle 5 Sek."],
+  alchimie = { labels = { "Manabrunnen", "Mana Well" }, names = { "alchemie", "alchemy" }, effect = L["Mana alle 5 Sek."],
     items = { 279990, 279970, 279956 },
     conflicts = { "Segen der Weisheit", "Großer Segen der Weisheit", "Blessing of Wisdom", "Greater Blessing of Wisdom" } },
-  schmiede = { names = { "schmiedekunst", "blacksmithing" }, effect = L["Stärke"],
+  schmiede = { labels = { "Schleifstein", "Sharpening Wheel" }, names = { "schmiedekunst", "blacksmithing" }, effect = L["Stärke"],
     items = { 279955, 279988, 279944 },
     conflicts = { "Stärke der Erde", "Strength of Earth" } },
-  verzauber = { names = { "verzauberkunst", "enchanting" }, effect = L["Rüstung und alle Werte"],
+  verzauber = { labels = { "Verzauberte Laute", "Enchanted Lute" }, names = { "verzauberkunst", "enchanting" }, effect = L["Rüstung und alle Werte"],
     items = { 279987, 279985, 279976 },
     conflicts = { "Mal der Wildnis", "Gabe der Wildnis", "Mark of the Wild", "Gift of the Wild" } },
   ingenieur = { names = { "ingenieurskunst", "engineering" }, effect = L["Reagenzien und Reparatur (kein Buff)"],
     items = { 279989, 279949, 279950 }, noBuff = true },
-  kraeuter = { names = { "kräuterkunde", "herbalism" }, effect = L["Intelligenz"],
+  kraeuter = { labels = { "Räucherkerze", "Incense Candle" }, names = { "kräuterkunde", "herbalism" }, effect = L["Intelligenz"],
     items = { 279947, 279964, 279962 },
     conflicts = { "Arkane Intelligenz", "Arkane Brillanz", "Arcane Intellect", "Arcane Brilliance" } },
   leder = { names = { "lederverarbeitung", "leatherworking" }, effect = L["Ruhebonus (Erfahrung)"],
     items = { 279945, 279941, 279978 } },
-  bergbau = { names = { "bergbau", "mining" }, effect = L["Angriffskraft"],
+  bergbau = { labels = { "Leitstein", "Lodestone" }, names = { "bergbau", "mining" }, effect = L["Angriffskraft"],
     items = { 279952, 279948, 279960 },
     conflicts = { "Segen der Macht", "Großer Segen der Macht", "Blessing of Might", "Greater Blessing of Might" } },
-  kuerschner = { names = { "kürschnerei", "skinning" }, effect = L["2 % kritische Trefferchance"],
+  kuerschner = { labels = { "Lagerstuhl", "Camp Chair" }, names = { "kürschnerei", "skinning" }, effect = L["2 % kritische Trefferchance"],
     items = { 279938, 279969, 279979 },
     conflicts = { "Aura des Moonkin", "Moonkin-Aura", "Moonkin Aura" } },
-  schneider = { names = { "schneiderei", "tailoring" }, effect = L["Willenskraft"],
+  schneider = { labels = { "Fraktionsbanner", "Faction Banner" }, names = { "schneiderei", "tailoring" }, effect = L["Willenskraft"],
     items = { 279959, 279943, 279972 },
     conflicts = { "Göttlicher Willen", "Gebet der Willenskraft", "Divine Spirit", "Prayer of Spirit" } },
-  erstehilfe = { names = { "erste hilfe", "first aid" }, effect = L["Ausdauer"],
+  erstehilfe = { labels = { "Verbandtasche", "First Aid Kit" }, names = { "erste hilfe", "first aid" }, effect = L["Ausdauer"],
     items = { 279951, 279940, 279968 },
     conflicts = { "Machtwort: Seelenstärke", "Gebet der Seelenstärke", "Power Word: Fortitude", "Prayer of Fortitude" } },
-  angeln = { names = { "angeln", "fishing" }, effect = L["8 % auf alle Werte"],
+  angeln = { labels = { "Fischglas", "Fish Bowl" }, names = { "angeln", "fishing" }, effect = L["8 % auf alle Werte"],
     items = { 279966, 279965, 279967 },
     conflicts = { "Segen der Könige", "Großer Segen der Könige", "Blessing of Kings", "Greater Blessing of Kings" } },
 }
@@ -332,14 +333,26 @@ end
 local function classify(itemID, bag, slot)
   if itemKind[itemID] ~= nil then return itemKind[itemID] end
   local _, _, _, _, _, classID = safe(C_Item.GetItemInfoInstant, itemID)
-  local spellName = safe(C_Item.GetItemSpell, itemID)
   local consumable = Enum and Enum.ItemClass and Enum.ItemClass.Consumable or 0
-  if classID ~= consumable or not spellName then
+  if classID == nil then return false end -- noch nicht bekannt: nicht cachen
+  if classID ~= consumable then
     itemKind[itemID] = false
     return false
   end
+  -- Ohne Item-Zauber (oder solange die Daten noch laden) nicht dauerhaft
+  -- als "kein Buff-Item" merken: frisch geplünderte oder beim Einloggen
+  -- noch nicht geladene Items würden sonst bis /reload fehlen.
+  local spellName = safe(C_Item.GetItemSpell, itemID)
+  if not spellName then
+    if C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, itemID) end
+    return false
+  end
   local lines = tooltipLines(bag, slot)
-  if #lines == 0 then return false end -- Tooltip noch nicht geladen: nicht cachen
+  local complete = false
+  for _, line in ipairs(lines) do
+    if line:find("benutzen") or line:find("use:") then complete = true break end
+  end
+  if not complete then return false end -- Tooltip noch unvollständig: nicht cachen
 
   local kind = false
   for _, line in ipairs(lines) do
@@ -1007,6 +1020,48 @@ local function collectCamp(missing)
   end
 end
 
+-- Klassenbuffs, die der aktive Lager-Buff blockiert ("Ein mächtigerer Zauber
+-- ist bereits aktiv"): Objektnamen im Tooltip des Lager-Buffs suchen.
+-- Liefert eine Menge (kleingeschriebene Zaubernamen -> true).
+local function campBlockedSpells()
+  local blocked = {}
+  if not (C_UnitAuras and C_UnitAuras.GetAuraDataByIndex and C_TooltipInfo) then return blocked end
+  for i = 1, 40 do
+    local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
+    if not ok or not aura then break end
+    if not isSecret(aura) and matchesAny(aura.name, CAMP_AURA_PATTERNS) then
+      local data = (aura.auraInstanceID and C_TooltipInfo.GetUnitBuffByAuraInstanceID
+          and safe(C_TooltipInfo.GetUnitBuffByAuraInstanceID, "player", aura.auraInstanceID))
+        or (C_TooltipInfo.GetUnitAura and safe(C_TooltipInfo.GetUnitAura, "player", i, "HELPFUL"))
+      local text = {}
+      for _, l in ipairs(data and data.lines or {}) do
+        for _, t in ipairs({ l.leftText, l.rightText }) do
+          if t and not isSecret(t) then table.insert(text, t:lower()) end
+        end
+      end
+      text = table.concat(text, "\n")
+      for _, obj in pairs(CAMP_OBJECTS) do
+        if obj.conflicts then
+          local names = {}
+          for _, n in ipairs(obj.labels or {}) do table.insert(names, n) end
+          for _, id in ipairs(obj.items) do
+            local n = safe(C_Item.GetItemNameByID, id)
+            if n then table.insert(names, n)
+            elseif C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end
+          end
+          for _, n in ipairs(names) do
+            if text:find(n:lower(), 1, true) then
+              for _, c in ipairs(obj.conflicts) do blocked[c:lower()] = true end
+              break
+            end
+          end
+        end
+      end
+    end
+  end
+  return blocked
+end
+
 ------------------------------------------------------------------------
 -- Anzeige
 ------------------------------------------------------------------------
@@ -1274,7 +1329,8 @@ end
 local function collectMissing()
   local missing = {}
 
-  -- Klassenbuffs
+  -- Klassenbuffs (ohne die, die ein aktiver Lager-Buff blockiert)
+  local campBlocked = campBlockedSpells()
   for _, g in ipairs(GROUPS) do
     if BuffCheckDB.enabled[g.key] then
       local castInfo, unreadable, active, expiring = nil, false, false, nil
@@ -1282,12 +1338,14 @@ local function collectMissing()
         local state, rem = hasBuff(name)
         if state == nil then unreadable = true end
         if state then active = true break end
-        if rem then
-          -- Läuft ab: genau diesen Buff erneuern, wenn du ihn kennst
-          expiring = math.max(expiring or 0, rem)
-          castInfo = knownSpell(name) or castInfo
+        if not campBlocked[name:lower()] then
+          if rem then
+            -- Läuft ab: genau diesen Buff erneuern, wenn du ihn kennst
+            expiring = math.max(expiring or 0, rem)
+            castInfo = knownSpell(name) or castInfo
+          end
+          if not castInfo then castInfo = knownSpell(name) end
         end
-        if not castInfo then castInfo = knownSpell(name) end
       end
       if not active and not unreadable and castInfo then
         table.insert(missing, {
@@ -1656,6 +1714,10 @@ SlashCmdList.BUFFCHECK = function(msg)
     local near, why = nearCampfire()
     say(L["Lagerfeuer in der Nähe: %s"]:format(near and (L["ja"] .. " (" .. why .. ")") or L["nein"]))
     say(L["Rolle für Lagerobjekte: %s"]:format(ROLE_NAMES[campRole()] or campRole()))
+    local blocked = {}
+    for n in pairs(campBlockedSpells()) do table.insert(blocked, n) end
+    table.sort(blocked)
+    say(L["Vom Lager-Buff blockiert: %s"]:format(#blocked > 0 and table.concat(blocked, ", ") or "-"))
     local list = campCandidates()
     if #list == 0 then say(L["Kein Lagerobjekt in der Tasche und kein passender Beruf."]) end
     for _, c in ipairs(list) do
