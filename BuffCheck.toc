@@ -1,14 +1,23 @@
 ## Interface: 16001
 ## Title: BuffCheck
-## Notes: Shows missing self-buffs (blessings, auras, buff food, elixirs, flasks) out of combat and suggests your camp object at campfires. Click to cast, use or craft. Settings: minimap button, /bc or Options → AddOns.
-## Notes-deDE: Zeigt fehlende Selbst-Buffs (Segen, Aura, Buff-Essen, Elixiere, Fläschchen) außerhalb des Kampfs und schlägt am Lagerfeuer dein Lagerobjekt vor. Klick zum Wirken, Benutzen oder Herstellen. Einstellungen: Minimap-Button, /bc oder Optionen → AddOns.
+## Notes: Shows missing self-buffs for every class (class buffs, poisons, buff food, elixirs, flasks) out of combat and suggests your camp object at campfires. Click to cast, use or craft. Settings: minimap button, /bc or Options → AddOns.
+## Notes-deDE: Zeigt fehlende Selbst-Buffs für jede Klasse (Klassenbuffs, Gifte, Buff-Essen, Elixiere, Fläschchen) außerhalb des Kampfs und schlägt am Lagerfeuer dein Lagerobjekt vor. Klick zum Wirken, Benutzen oder Herstellen. Einstellungen: Minimap-Button, /bc oder Optionen → AddOns.
 ## Author: Kai
-## Version: 1.7
+## Version: 1.8
 ## X-License: MIT
 ## IconTexture: Interface\Icons\INV_Potion_62
 ## AddonCompartmentFunc: BuffCheck_OnAddonCompartmentClick
 ## SavedVariables: BuffCheckDB
 
 Locale.lua
+Classes\Paladin.lua
+Classes\Warrior.lua
+Classes\Mage.lua
+Classes\Priest.lua
+Classes\Druid.lua
+Classes\Warlock.lua
+Classes\Hunter.lua
+Classes\Shaman.lua
+Classes\Rogue.lua
 BuffCheck.lua
 Options.lua

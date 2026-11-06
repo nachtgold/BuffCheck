@@ -12,6 +12,7 @@ local SLOT_TEXT = {
   flask      = L["Fläschchen"],
   flask_heal = L["Fläschchen (Weisheit)"],
   flask_tank = L["Fläschchen (Titanen)"],
+  flask_caster = L["Fläschchen (Oberste Macht)"],
   staerke    = L["Stärke"],
   bew        = L["Beweglichkeit"],
   angriff    = L["Angriffskraft"],
@@ -24,12 +25,14 @@ local SLOT_TEXT = {
   int        = L["Intelligenz"],
 }
 
+-- Alle Rollen; angezeigt werden "Alle", "Auto" und die Rollen deiner Klasse
 local ROLES = {
-  { "alle", L["Alle"],    L["Jedes Elixier, das du herstellen kannst"] },
-  { "auto", L["Auto"],    L["Nach Talentbaum: Heilig, Schutz oder Vergeltung"] },
-  { "heal", L["Heiler"],  L["Fläschchen, Heilung, Mana-Reg., Intelligenz"] },
-  { "tank", L["Tank"],    L["Fläschchen, Gesundheit, Rüstung, Stärke"] },
-  { "dd",   L["Schaden"], L["Fläschchen, Stärke, Beweglichkeit, Angriffskraft"] },
+  { "alle",   L["Alle"],     L["Jedes Elixier, das du herstellen kannst"] },
+  { "auto",   L["Auto"],     L["Nach dem Talentbaum mit den meisten Punkten"] },
+  { "heal",   L["Heiler"],   L["Fläschchen, Heilung, Mana-Reg., Intelligenz"] },
+  { "tank",   L["Tank"],     L["Fläschchen, Gesundheit, Rüstung, Stärke"] },
+  { "dd",     L["Nahkampf"], L["Fläschchen, Stärke, Beweglichkeit, Angriffskraft"] },
+  { "caster", L["Zauberer"], L["Fläschchen, Zauberschaden, Intelligenz, Mana-Reg."] },
 }
 
 ------------------------------------------------------------------------
@@ -217,14 +220,17 @@ local function buildContent(f)
 
   -- Klassenbuffs -------------------------------------------------------
   header(f, Y - 300, L["Klassenbuffs"])
-  local cx = 20
-  for _, g in ipairs(ns.GROUPS) do
+  -- 3 pro Zeile; jede weitere Zeile schiebt den Rest der Seite nach unten
+  for i, g in ipairs(ns.GROUPS) do
     local key = g.key
-    checkbox(f, cx, Y - 322, g.label,
+    local col, row = (i - 1) % 3, math.floor((i - 1) / 3)
+    checkbox(f, 20 + col * 190, Y - 322 - row * 24, g.label,
       function() return BuffCheckDB.enabled[key] end,
       function(v) BuffCheckDB.enabled[key] = v end)
-    cx = cx + 135
   end
+  local extraRows = math.max(0, math.ceil(#ns.GROUPS / 3) - 1)
+  Y = Y - extraRows * 24
+  CONTENT_HEIGHT = CONTENT_HEIGHT + extraRows * 24
 
   -- Verbrauchsgüter ----------------------------------------------------
   header(f, Y - 360, L["Verbrauchsgüter"])
@@ -269,26 +275,30 @@ local function buildContent(f)
   roleLabel:SetPoint("TOPLEFT", 24, Y - 564)
   roleLabel:SetText(L["Rolle:"])
   local rx = 90
+  local classRole = { alle = true, auto = true }
+  for _, k in ipairs(ns.CLASS_ROLES) do classRole[k] = true end
   for _, r in ipairs(ROLES) do
-    local key = r[1]
-    local rb = CreateFrame("CheckButton", nil, f, "UIRadioButtonTemplate")
-    rb:SetSize(16, 16)
-    rb:SetPoint("TOPLEFT", rx, Y - 563)
-    rb.label = rb:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    rb.label:SetPoint("LEFT", rb, "RIGHT", 2, 0)
-    rb.label:SetText(r[2])
-    rb:SetHitRectInsets(0, -(rb.label:GetStringWidth() + 4), 0, 0)
-    rb:SetScript("OnClick", function()
-      BuffCheckDB.role = key
-      changed()
-    end)
-    tooltip(rb, r[3])
-    rb.refresh = function()
-      rb:SetChecked(BuffCheckDB.role == key)
-      setDimmed(rb, alchemyOff())
+    if classRole[r[1]] then
+      local key = r[1]
+      local rb = CreateFrame("CheckButton", nil, f, "UIRadioButtonTemplate")
+      rb:SetSize(16, 16)
+      rb:SetPoint("TOPLEFT", rx, Y - 563)
+      rb.label = rb:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+      rb.label:SetPoint("LEFT", rb, "RIGHT", 2, 0)
+      rb.label:SetText(r[2])
+      rb:SetHitRectInsets(0, -(rb.label:GetStringWidth() + 4), 0, 0)
+      rb:SetScript("OnClick", function()
+        ns.setRole(key)
+        changed()
+      end)
+      tooltip(rb, r[3])
+      rb.refresh = function()
+        rb:SetChecked(ns.getRole() == key)
+        setDimmed(rb, alchemyOff())
+      end
+      table.insert(widgets, rb)
+      rx = rx + rb.label:GetStringWidth() + 32
     end
-    table.insert(widgets, rb)
-    rx = rx + 86
   end
 
   local slotLabel = f:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -390,6 +400,7 @@ local function createPanel()
   end)
 
   buildContent(content)
+  content:SetHeight(CONTENT_HEIGHT) -- kann sich durch mehr Klassenbuffs erhöhen
   p:SetScript("OnShow", function() C_Timer.After(0, refreshAll) end)
   return p
 end

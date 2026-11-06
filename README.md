@@ -2,7 +2,7 @@
 
 A World of Warcraft addon for **WoW Forever** that shows which of your self-buffs are missing, out of combat. Click an icon to cast, use or craft what's missing.
 
-It was built for a paladin alchemist, but the bag scan, food and elixir checks work for any class.
+It started out for a paladin alchemist and now supports all nine classes. Only the data for your own class is loaded.
 
 ![Missing buffs with tooltip](screenshots/ready-tooltip.png)
 
@@ -12,7 +12,21 @@ It was built for a paladin alchemist, but the bag scan, food and elixir checks w
 
 *Blessing and aura missing (first two icons), followed by elixirs from your bags.*
 
-- **Class buffs (paladin):** blessing, aura and, optionally, Righteous Fury. Click to cast. When a blessing is about to expire, the click recasts that same blessing.
+- **Class buffs:** click to cast. The suggestion is the spell of that group you used last (your usual aura or armor, for example), otherwise the first one you know. When a buff is about to expire, the click recasts that same buff.
+
+  | Class | Checked |
+  | --- | --- |
+  | Paladin | Blessing, aura, Righteous Fury (off by default) |
+  | Priest | Fortitude, Inner Fire, Divine Spirit, Shadowform, Shadow Protection (off by default) |
+  | Mage | Arcane Intellect, armor (Mage, Ice or Frost Armor) |
+  | Druid | Mark of the Wild, Omen of Clarity, Thorns (off by default) |
+  | Warlock | Demon Armor / Demon Skin |
+  | Hunter | Aspect (suggests Hawk or Monkey, any aspect counts), Trueshot Aura |
+  | Shaman | Lightning Shield, weapon imbue on the main hand |
+  | Rogue | Poison on main hand and off hand, taken from your bags (highest rank) |
+  | Warrior | Battle Shout (off by default, since it needs rage) |
+
+  Talent spells only show up once you've learned them. The alchemy role (healer, tank, melee, caster) is saved per character.
 - **Gathering tracking:** Find Herbs or Find Minerals, only if your character has Herbalism or Mining. Click to turn tracking on.
 - **Buff food:** shows your buff food when "Well Fed" is missing.
 - **Buff items from your bags:** elixirs, scrolls and other consumables whose buff lasts at least 10 minutes are detected automatically from their tooltip.
@@ -79,7 +93,7 @@ Copy the `BuffCheck` folder to `World of Warcraft/_forever_/Interface/AddOns/` a
 
 ## Deutsch (Kurzfassung)
 
-BuffCheck zeigt außerhalb des Kampfs, welche Selbst-Buffs dir fehlen: Segen, Aura, Buff-Essen, Elixiere und Schriftrollen aus der Tasche. Als Alchemist siehst du außerdem die Elixiere und Fläschchen, die du selbst herstellen kannst.
+BuffCheck zeigt außerhalb des Kampfs, welche Selbst-Buffs dir fehlen: Klassenbuffs aller neun Klassen (inklusive Schurkengifte und Schamanen-Waffenverzauberung), Buff-Essen, Elixiere und Schriftrollen aus der Tasche. Geladen werden nur die Daten deiner Klasse. Als Alchemist siehst du außerdem die Elixiere und Fläschchen, die du selbst herstellen kannst.
 
 - **Graues Icon:** erst herstellen. Ein Klick stellt den Trank über das Alchemie-Fenster her.
 - **Farbiges Icon:** benutzen.

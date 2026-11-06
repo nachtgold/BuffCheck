@@ -10,40 +10,19 @@ local REFRESH_BELOW = 30      -- Sekunden Restlaufzeit, ab der ein Buff als "feh
 local MIN_BUFF_MINUTES = 10   -- Verbrauchsgüter mit kürzerer Wirkung (Heiltränke etc.) ignorieren
 
 ------------------------------------------------------------------------
--- Klassen-Gruppen: Eintrag fehlt, wenn KEINER der Buffs aktiv ist und du
--- mindestens einen der Zauber kennst. Erster bekannter Zauber = Klick-Zauber.
+-- Klassen-Gruppen kommen aus Classes\<Klasse>.lua: nur die Datei der eigenen
+-- Klasse läuft und legt ns.CLASS an. Ein Eintrag fehlt, wenn KEINER der Buffs
+-- aktiv ist und du mindestens einen der Zauber kennst. Vorgeschlagen wird der
+-- zuletzt aktive Zauber der Gruppe, sonst der erste bekannte.
+--   spells = Buffs, die die Gruppe erfüllen
+--   cast   = (optional) nur diese Zauber vorschlagen
+--   prof   = (optional) Zauber -> nötiger Beruf
+--   weapon = Waffenverzauberung statt Buff: { slots, spells oder items, labels }
 ------------------------------------------------------------------------
-local GROUPS = {
-  {
-    key = "segen", label = L["Segen"],
-    spells = {
-      "Großer Segen der Könige", "Segen der Könige",
-      "Großer Segen der Macht", "Segen der Macht",
-      "Großer Segen der Weisheit", "Segen der Weisheit",
-      "Großer Segen des Lichts", "Segen des Lichts",
-      "Großer Segen des Refugiums", "Segen des Refugiums",
-      "Greater Blessing of Kings", "Blessing of Kings",
-      "Greater Blessing of Might", "Blessing of Might",
-      "Greater Blessing of Wisdom", "Blessing of Wisdom",
-      "Greater Blessing of Light", "Blessing of Light",
-      "Greater Blessing of Sanctuary", "Blessing of Sanctuary",
-    },
-  },
-  {
-    key = "aura", label = L["Aura"],
-    spells = {
-      "Aura der Hingabe", "Vergeltungsaura", "Konzentrationsaura",
-      "Aura der Heiligkeit", "Aura des Schattenwiderstands",
-      "Aura des Frostwiderstands", "Aura des Feuerwiderstands",
-      "Devotion Aura", "Retribution Aura", "Concentration Aura",
-      "Sanctity Aura", "Shadow Resistance Aura",
-      "Frost Resistance Aura", "Fire Resistance Aura",
-    },
-  },
-  {
-    key = "zorn", label = L["Zorn d. Gerechtigkeit"], defaultOff = true,
-    spells = { "Zorn der Gerechtigkeit", "Righteous Fury" },
-  },
+local CLASS = ns.CLASS or { groups = {}, roleByTab = {}, roles = { "dd" }, defaultRole = "dd" }
+local GROUPS = {}
+for _, g in ipairs(CLASS.groups) do table.insert(GROUPS, g) end
+for _, g in ipairs({
   {
     -- Sammelberufe: nur eine Suche kann aktiv sein; nur mit dem passenden Beruf
     key = "suche", label = L["Suche (Sammelberuf)"],
@@ -55,7 +34,7 @@ local GROUPS = {
       ["Find Minerals"] = { "bergbau", "mining" },
     },
   },
-}
+}) do table.insert(GROUPS, g) end
 
 -- Name des Essens-Buffs (deutsch / englisch)
 local WELL_FED = { "Satt", "Well Fed" }
@@ -79,6 +58,9 @@ local ALCH_SLOTS = {
   } },
   flask_tank = { label = L["Fläschchen"], list = {
     { 13510, 17626, 300 }, -- Fläschchen der Titanen (+1200 Leben, 2 Std.)
+  } },
+  flask_caster = { label = L["Fläschchen"], list = {
+    { 13512, 17628, 300 }, -- Fläschchen der obersten Macht (+150 Zauberschaden, 2 Std.)
   } },
   heilung = { label = L["Heilung"], list = {
     { 250333, 1250926, 195 }, -- Großes Klerikerelixier (+40 Heilung)
@@ -161,10 +143,11 @@ local ROLE_SLOTS = {
   heal = { "flask_heal", "heilung", "manareg", "int" },
   tank = { "flask_tank", "leben", "ruestung", "staerke" },
   dd   = { "flask_tank", "staerke", "bew", "angriff" },
+  caster = { "flask_caster", "zauber", "int", "manareg" },
   alle = { "flask", "staerke", "bew", "angriff", "zauber", "leben", "ruestung",
            "regen", "heilung", "manareg", "int" },
 }
-local ROLE_NAMES = { heal = L["Heilig (Heiler)"], tank = L["Schutz (Tank)"], dd = L["Vergeltung (Schaden)"],
+local ROLE_NAMES = { heal = L["Heiler"], tank = L["Tank"], dd = L["Nahkampf"], caster = L["Zauberer"],
   alle = L["alle (jedes herstellbare Elixier)"] }
 
 -- Alle Item-IDs, die zu einem Slot gehören (für den Rezept-Scan)
@@ -227,8 +210,9 @@ local CAMP_PRIORITY = {
            "leder", "alchimie", "kraeuter", "schneider", "ingenieur" },
   dd   = { "bergbau", "kuerschner", "angeln", "schmiede", "verzauber", "erstehilfe",
            "leder", "alchimie", "kraeuter", "schneider", "ingenieur" },
+  caster = { "kraeuter", "alchimie", "kuerschner", "angeln", "verzauber", "schneider",
+           "erstehilfe", "leder", "bergbau", "schmiede", "ingenieur" },
 }
-local CASTER_CLASSES = { PRIEST = "heal", MAGE = "heal", WARLOCK = "heal", DRUID = "heal", SHAMAN = "heal" }
 
 -- Lagerfeuer-Sets (werden nicht als Buff-Item behandelt)
 local CAMP_KITS = { 279981, 279961, 279974 }
@@ -440,13 +424,32 @@ local function alchemySkill()
   return 0
 end
 
-local ROLE_BY_TAB = { "heal", "tank", "dd" } -- Paladin: Heilig, Schutz, Vergeltung
+local ROLE_BY_TAB = CLASS.roleByTab -- Talentbaum -> Rolle
+
+-- Rollen, die für die Klasse in Frage kommen (plus "alle" und "auto")
+local CLASS_ROLE = { alle = true, auto = true }
+for _, r in ipairs(CLASS.roles) do CLASS_ROLE[r] = true end
+
+-- Rolle pro Charakter (früher kontoweit in BuffCheckDB.role)
+local function roleKey()
+  return (UnitName("player") or "?") .. "-" .. (GetRealmName and GetRealmName() or "?")
+end
+local function getRole()
+  local r = BuffCheckDB.roles and BuffCheckDB.roles[roleKey()]
+  if r and CLASS_ROLE[r] then return r end
+  r = BuffCheckDB.role
+  if r and CLASS_ROLE[r] then return r end
+  return "alle"
+end
+local function setRole(r)
+  BuffCheckDB.roles = BuffCheckDB.roles or {}
+  BuffCheckDB.roles[roleKey()] = r
+end
 
 local function currentRole(forceAuto)
-  local r = BuffCheckDB.role
-  if not forceAuto and r and r ~= "auto" and ROLE_SLOTS[r] then return r end
-  local _, class = UnitClass("player")
-  if class ~= "PALADIN" then return "dd" end
+  local r = getRole()
+  if not forceAuto and r ~= "auto" and ROLE_SLOTS[r] then return r end
+  local fallback = CLASS.defaultRole or "dd"
   if GetSpecialization then
     local s = safe(GetSpecialization)
     if s and ROLE_BY_TAB[s] then return ROLE_BY_TAB[s] end
@@ -463,7 +466,7 @@ local function currentRole(forceAuto)
     end
     if best and ROLE_BY_TAB[best] then return ROLE_BY_TAB[best] end
   end
-  return "dd"
+  return fallback
 end
 
 -- Item benutzbar (Mindeststufe)? Unbekannt (noch nicht geladen) = ja
@@ -928,12 +931,9 @@ end
 local function campRole()
   local role = currentRole()
   if CAMP_PRIORITY[role] then return role end
-  local _, class = UnitClass("player")
-  if class == "PALADIN" then
-    role = currentRole(true)
-    if CAMP_PRIORITY[role] then return role end
-  end
-  return CASTER_CLASSES[class] or "dd"
+  -- "alle": Rolle nach Talentbaum
+  role = currentRole(true)
+  return CAMP_PRIORITY[role] and role or "dd"
 end
 
 -- Ist die gemeinsame Abklingzeit der Lagerobjekte aktiv (schon eins aufgestellt)?
@@ -1454,6 +1454,118 @@ local function itemEntry(id, label)
   }
 end
 
+------------------------------------------------------------------------
+-- Zuletzt benutzter Zauber je Gruppe (pro Charakter): wird als nächstes
+-- vorgeschlagen, z. B. deine gewohnte Aura oder Rüstung.
+------------------------------------------------------------------------
+local function lastSpells()
+  BuffCheckDB.last = BuffCheckDB.last or {}
+  local k = roleKey()
+  BuffCheckDB.last[k] = BuffCheckDB.last[k] or {}
+  return BuffCheckDB.last[k]
+end
+
+-- Waffen-Zauber (Schamane): gewirkte Verzauberung merken
+local WEAPON_SPELL = {}
+for _, g in ipairs(GROUPS) do
+  if g.weapon and g.weapon.spells then
+    for _, n in ipairs(g.weapon.spells) do WEAPON_SPELL[n:lower()] = g.key end
+  end
+end
+if next(WEAPON_SPELL) then
+  local castWatch = CreateFrame("Frame")
+  pcall(castWatch.RegisterUnitEvent, castWatch, "UNIT_SPELLCAST_SUCCEEDED", "player")
+  castWatch:SetScript("OnEvent", function(_, _, _, _, spellID)
+    local name = spellID and safe(C_Spell.GetSpellName, spellID)
+    local key = name and WEAPON_SPELL[name:lower()]
+    if key then lastSpells()[key] = name end
+  end)
+end
+
+-- Waffenverzauberung: Restzeit je Slot (16 Waffenhand, 17 Schildhand)
+local function weaponEnchant(slot)
+  if not GetWeaponEnchantInfo then return nil end
+  local ok, hasMH, mhExp, _, _, hasOH, ohExp = pcall(GetWeaponEnchantInfo)
+  if not ok or isSecret(hasMH) or isSecret(hasOH) then return nil end
+  local has, exp = hasMH, mhExp
+  if slot == 17 then has, exp = hasOH, ohExp end
+  if not has then return false end
+  if type(exp) == "number" and not isSecret(exp) then
+    local rem = exp / 1000
+    if rem < warnBefore() then return false, rem end
+  end
+  return true
+end
+
+-- Liegt in diesem Slot eine Waffe? (Schildhand: kein Schild/Buch)
+local function hasWeapon(slot)
+  local id = GetInventoryItemID and GetInventoryItemID("player", slot)
+  if not id or isSecret(id) then return false end
+  if slot == 16 then return true end
+  local getInfo = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+  local _, _, _, _, _, classID = safe(getInfo, id)
+  return classID == 2
+end
+
+-- Bestes Gift für einen Slot aus der Tasche (Namensmuster, höchster Rang)
+local WEAPON_ITEM = {} -- erkannte Gifte: nicht zusätzlich als Buff-Item zeigen
+local function findWeaponItem(prefs)
+  local found = {}
+  for bag = 0, (NUM_BAG_SLOTS or 4) do
+    for slot = 1, (safe(C_Container.GetContainerNumSlots, bag) or 0) do
+      local id = safe(C_Container.GetContainerItemID, bag, slot)
+      local name = id and safe(C_Item.GetItemNameByID, id)
+      if name then
+        name = name:lower()
+        for p, pats in ipairs(prefs) do
+          for _, pat in ipairs(pats) do
+            if name:find(pat, 1, true) then
+              WEAPON_ITEM[id] = true
+              if not BuffCheckDB.ignored[id] and levelOK(id) and (not found[p] or id > found[p]) then
+                found[p] = id
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  for p = 1, #prefs do if found[p] then return found[p] end end
+end
+
+local function collectWeapon(g, missing)
+  local w = g.weapon
+  for _, slot in ipairs(w.slots) do
+    local state, rem = weaponEnchant(slot)
+    if state == false and hasWeapon(slot) then
+      local label = (w.labels and w.labels[slot]) or g.label
+      if w.spells then
+        local last = lastSpells()[g.key]
+        local info = last and knownSpell(last)
+        if not info then
+          for _, n in ipairs(w.spells) do
+            info = knownSpell(n)
+            if info then break end
+          end
+        end
+        if info then
+          table.insert(missing, { text = label, icon = info.iconID, hint = info.name,
+            type = "spell", value = info.name, expiring = rem })
+        end
+      elseif w.items then
+        local id = findWeaponItem(w.items[slot])
+        if id then
+          local e = itemEntry(id, label)
+          e.type, e.value = "macro", ("/use item:%d\n/use %d"):format(id, slot)
+          e.hint = safe(C_Item.GetItemNameByID, id)
+          e.expiring = rem
+          table.insert(missing, e)
+        end
+      end
+    end
+  end
+end
+
 local function collectMissing()
   local missing = {}
 
@@ -1465,16 +1577,27 @@ local function collectMissing()
     for _, n in ipairs(names) do if profs[n] then return true end end
     return false
   end
+  local last = lastSpells()
   for _, g in ipairs(GROUPS) do
-    if BuffCheckDB.enabled[g.key] then
+    if BuffCheckDB.enabled[g.key] and g.weapon then
+      collectWeapon(g, missing)
+    elseif BuffCheckDB.enabled[g.key] then
       local castInfo, unreadable, active, expiring = nil, false, false, nil
+      local function usable(name)
+        -- Zauber, die einen Beruf brauchen, nur vorschlagen, wenn du ihn hast
+        if g.cast and not g.cast[name] then return false end
+        if g.prof and g.prof[name] and not hasProf(g.prof[name]) then return false end
+        return not campBlocked[name:lower()]
+      end
       for _, name in ipairs(g.spells) do
         local state, rem = hasBuff(name)
         if state == nil then unreadable = true end
-        if state then active = true break end
-        -- Zauber, die einen Beruf brauchen, nur vorschlagen, wenn du ihn hast
-        local profOK = not (g.prof and g.prof[name]) or hasProf(g.prof[name])
-        if profOK and not campBlocked[name:lower()] then
+        if state then
+          active = true
+          if usable(name) then last[g.key] = name end
+          break
+        end
+        if usable(name) then
           if rem then
             -- Läuft ab: genau diesen Buff erneuern, wenn du ihn kennst
             expiring = math.max(expiring or 0, rem)
@@ -1482,6 +1605,10 @@ local function collectMissing()
           end
           if not castInfo then castInfo = knownSpell(name) end
         end
+      end
+      -- Sonst den zuletzt aktiven Zauber der Gruppe vorschlagen
+      if not expiring and last[g.key] and usable(last[g.key]) then
+        castInfo = knownSpell(last[g.key]) or castInfo
       end
       if not active and not unreadable and castInfo then
         table.insert(missing, {
@@ -1521,7 +1648,7 @@ local function collectMissing()
     local seenBuff = {}
     for _, id in ipairs(sorted) do
       local buff = safe(C_Item.GetItemSpell, id)
-      if buff and not seenBuff[buff] and not handled[id] and not CAMP_ITEM[id] then
+      if buff and not seenBuff[buff] and not handled[id] and not CAMP_ITEM[id] and not WEAPON_ITEM[id] then
         seenBuff[buff] = true -- gleiche Wirkung (z. B. zwei Ränge) nur einmal zeigen
         local s, rem = hasBuff(buff)
         if s == false then
@@ -1608,7 +1735,7 @@ local function update()
     b:SetAttribute("item", m.type == "item" and m.value or nil)
     b:SetAttribute("macrotext", m.type == "macro" and m.value or nil)
     -- Woher der Cooldown kommt: Item, Zauber oder Rezept-Zauber
-    if m.type == "item" then
+    if m.type == "item" or (m.type == "macro" and m.itemID) then
       b.cdKind, b.cdValue = "item", m.itemID
     elseif m.type == "spell" then
       b.cdKind, b.cdValue = "spell", m.value
@@ -1718,6 +1845,12 @@ C_Timer.NewTicker(5, function() if not InCombatLockdown() then update() end end)
 ------------------------------------------------------------------------
 local function say(msg) print("|cff33aaffBuffCheck:|r " .. msg) end
 local function linkID(s) return tonumber(s:match("item:(%d+)") or s) end
+local function groupKeys()
+  local keys = {}
+  for _, g in ipairs(GROUPS) do table.insert(keys, g.key) end
+  for _, k in ipairs({ "essen", "elixier", "alchemie", "lager" }) do table.insert(keys, k) end
+  return table.concat(keys, ", ")
+end
 
 local function setMoving(unlocked)
   if InCombatLockdown() then return say(L["Im Kampf nicht möglich."]) end
@@ -1741,6 +1874,9 @@ ns.say = say
 ns.safe = safe
 ns.queueUpdate = queueUpdate
 ns.currentRole = currentRole
+ns.getRole = getRole
+ns.setRole = setRole
+ns.CLASS_ROLES = CLASS.roles
 ns.alchemySkill = alchemySkill
 ns.knownRecipes = knownRecipes
 ns.setMoving = setMoving
@@ -1792,7 +1928,7 @@ SlashCmdList.BUFFCHECK = function(msg)
     queueUpdate()
   elseif cmd == "toggle" then
     local key = rest:lower()
-    if BuffCheckDB.enabled[key] == nil then return say("Gruppen: segen, aura, zorn, essen, elixier, alchemie, lager") end
+    if BuffCheckDB.enabled[key] == nil then return say(L["Gruppen: %s"]:format(groupKeys())) end
     BuffCheckDB.enabled[key] = not BuffCheckDB.enabled[key]
     say(key .. ": " .. (BuffCheckDB.enabled[key] and L["an"] or L["aus"]))
     queueUpdate()
@@ -1811,7 +1947,7 @@ SlashCmdList.BUFFCHECK = function(msg)
     elseif arg == "info" then
       local role = currentRole()
       say((L["Alchemie-Skill: %d, Rolle: %s%s"]):format(alchemySkill(), ROLE_NAMES[role],
-        BuffCheckDB.role == "auto" and L[" (automatisch)"] or ""))
+        getRole() == "auto" and L[" (automatisch)"] or ""))
       for _, key in ipairs(ROLE_SLOTS[role]) do
         local best
         for _, e in ipairs(ALCH_SLOTS[key].list) do
@@ -1900,8 +2036,8 @@ SlashCmdList.BUFFCHECK = function(msg)
     say(ok and L["Prüfung: %d Einträge fehlen"]:format(#err) or L["Prüfung: FEHLER: %s"]:format(tostring(err)))
   elseif cmd == "rolle" or cmd == "role" then
     local r = rest:lower()
-    if r ~= "auto" and not ROLE_SLOTS[r] then return say("Benutzung: /bc rolle <alle|auto|heal|tank|dd>") end
-    BuffCheckDB.role = r
+    if not CLASS_ROLE[r] then return say("Benutzung: /bc rolle <alle|auto|" .. table.concat(CLASS.roles, "|") .. ">") end
+    setRole(r)
     say("Rolle: " .. (r == "auto" and "automatisch (" .. ROLE_NAMES[currentRole()] .. ")" or ROLE_NAMES[r]))
     queueUpdate()
   elseif cmd == "mount" then
