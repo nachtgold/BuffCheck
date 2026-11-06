@@ -164,6 +164,7 @@ local EN = {
   ["Weitere Möglichkeiten:"] = "Other options:",
   ["wirkt nicht mit %s"] = "doesn't stack with %s",
   ["in der Tasche"] = "in bags",
+  ["steht schon im Lager"] = "already in camp",
   ["herstellen"] = "craft",
   ["Jedes Objekt gibt es nur einmal pro Lager. Steht deins schon, nimm das nächste."] = "Each object can only be placed once per camp. If yours is already there, use the next one.",
   ["Am Lagerfeuer aufstellen: %s"] = "Place at the campfire: %s",

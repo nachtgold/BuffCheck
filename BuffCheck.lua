@@ -932,8 +932,26 @@ local function campOnCooldown(id)
   return type(start) == "number" and type(dur) == "number" and start > 0 and dur > 2
 end
 
+local campBuff -- weiter unten definiert
+
+-- Steht dieses Objekt schon im Lager? (Name im Tooltip des Lager-Buffs)
+local function campObjectInText(obj, text)
+  if not text or text == "" then return false end
+  local names = {}
+  for _, n in ipairs(obj.labels or {}) do table.insert(names, n) end
+  for _, id in ipairs(obj.items) do
+    local n = safe(C_Item.GetItemNameByID, id)
+    if n then table.insert(names, n) end
+  end
+  for _, n in ipairs(names) do
+    if text:find(n:lower(), 1, true) then return true end
+  end
+  return false
+end
+
 -- Bewertet jedes Lagerobjekt, das du aufstellen oder herstellen könntest
 local function campCandidates()
+  local _, campText = campBuff()
   local skills = professionSkills()
   local level = UnitLevel("player")
   local maxLevel = (GetMaxPlayerLevel and safe(GetMaxPlayerLevel)) or 60
@@ -957,7 +975,8 @@ local function campCandidates()
       for _, n in ipairs(obj.conflicts or {}) do
         if hasBuff(n) then blockedBy = n break end
       end
-      table.insert(list, { key = key, obj = obj, have = have, skill = skill, blockedBy = blockedBy })
+      table.insert(list, { key = key, obj = obj, have = have, skill = skill, blockedBy = blockedBy,
+        inCamp = campObjectInText(obj, campText) })
     end
   end
   return list
@@ -975,15 +994,17 @@ local function collectCamp(missing)
   for _, c in ipairs(list) do
     if campOnCooldown(c.have or c.obj.items[#c.obj.items]) then return end
   end
-  -- Bestes Objekt: vorrätig und nicht durch einen Klassenbuff wirkungslos
+  -- Bestes Objekt: noch nicht im Lager, vorrätig und nicht durch einen
+  -- Klassenbuff wirkungslos
   local pick
   for _, c in ipairs(list) do
-    if c.have and not c.blockedBy then pick = c break end
+    if c.have and not c.blockedBy and not c.inCamp then pick = c break end
   end
   for _, c in ipairs(list) do
-    if not pick and not c.blockedBy then pick = c end
+    if not pick and not c.blockedBy and not c.inCamp then pick = c end
   end
-  pick = pick or list[1]
+  -- Alles Sinnvolle steht schon im Lager: nichts vorschlagen
+  if not pick then return end
 
   local extra = {}
   table.insert(extra, { L["Bringt: %s"]:format(pick.obj.effect), 1, 1, 1 })
@@ -996,7 +1017,8 @@ local function collectCamp(missing)
     for _, c in ipairs(list) do
       if c ~= pick then
         local id = c.have or c.obj.items[#c.obj.items]
-        local state = c.blockedBy and L["wirkt nicht mit %s"]:format(c.blockedBy)
+        local state = (c.inCamp and L["steht schon im Lager"])
+          or (c.blockedBy and L["wirkt nicht mit %s"]:format(c.blockedBy))
           or (c.have and L["in der Tasche"]) or L["herstellen"]
         table.insert(extra, { ("  %s – %s (%s)"):format(campItemName(id), c.obj.effect, state), 0.8, 0.8, 0.8 })
       end
@@ -1046,7 +1068,7 @@ local function scanBuffTooltip(index)
 end
 
 -- Aktiver Lager-Buff (Camp Benefits) und der Text seines Tooltips (klein)
-local function campBuff()
+function campBuff()
   if not (C_UnitAuras and C_UnitAuras.GetAuraDataByIndex) then return nil end
   for i = 1, 40 do
     local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
@@ -1825,7 +1847,8 @@ SlashCmdList.BUFFCHECK = function(msg)
       say(("  %s – %s | %s%s%s"):format(campItemName(id), c.obj.effect,
         c.have and L["in der Tasche"] or L["herstellen"],
         c.skill > 0 and (" | Skill " .. c.skill) or "",
-        c.blockedBy and (" | " .. L["wirkt nicht mit %s"]:format(c.blockedBy)) or ""))
+        c.blockedBy and (" | " .. L["wirkt nicht mit %s"]:format(c.blockedBy)) or "")
+        .. (c.inCamp and (" | " .. L["steht schon im Lager"]) or ""))
     end
     local auras = {}
     for i = 1, 40 do
