@@ -1,0 +1,31 @@
+README.md
+  s_db04cc69ee73f8::t_2f38fb946f6827 24-29,60,72,84
+Locale.lua
+  s_db04cc69ee73f8::t_e85b5963c9799f 102,149-177
+  s_db04cc69ee73f8::t_77fa4c1ff1e28f 178
+BuffCheck.toc
+  s_db04cc69ee73f8::t_2f38fb946f6827 3-4,6
+BuffCheck.lua
+  s_db04cc69ee73f8::t_fe6a68e68d91fe 168-232
+  s_db04cc69ee73f8::t_d0b0f807655caa 167,804-865,867-1009
+  s_db04cc69ee73f8::t_e85b5963c9799f 1654-1676,1719
+  s_db04cc69ee73f8::t_f4b695d08a7902 421,423,866,1102-1104,1138,1305-1306,1330,1367-1368,1379,1386-1387,1470,1601
+Options.lua
+  s_db04cc69ee73f8::t_e85b5963c9799f 235-238
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c100e92370ec187971795d672f5507ba14e2fb01",
+  "prompts": {},
+  "sessions": {
+    "s_db04cc69ee73f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "03ff2b7b-bc2a-4fc8-861f-60b591ca5101",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "nachtgold <kai.zimmermann@amplimind.io>"
+    }
+  }
+}
