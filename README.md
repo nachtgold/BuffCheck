@@ -86,7 +86,7 @@ Copy the `BuffCheck` folder to `World of Warcraft/_forever_/Interface/AddOns/` a
 - The bar is hidden in combat. Addons can't change click-to-cast buttons during combat, and buff data is partly restricted there.
 - WoW Forever doesn't let addon buttons cast recipes as spells. Crafting therefore goes through the Alchemy window, which the addon opens and closes for you.
 - Drinking a crafted potion still needs your own click, because Blizzard only allows items to be used from a hardware click.
-- Addons can't see campfires directly. BuffCheck detects one by a campfire buff on you, or by a campfire placed by you or your group within 15 yards. A fire placed by a stranger is only noticed once its buff reaches you. `/bc lager` shows what was detected.
+- Addons can't see campfires directly. Camp objects are only suggested while you have the "Campfire Nearby" buff. `/bc lager` shows whether it was detected.
 - Recipe data (skill levels, durations, effects) comes from Wowhead's WoW Forever database as of November 2026.
 
 ---

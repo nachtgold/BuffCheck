@@ -220,11 +220,11 @@ local CAMP_ITEM = {}
 for _, o in pairs(CAMP_OBJECTS) do for _, id in ipairs(o.items) do CAMP_ITEM[id] = true end end
 for _, id in ipairs(CAMP_KITS) do CAMP_ITEM[id] = true end
 
--- Woran ein Lagerfeuer in der Nähe erkannt wird
+-- Lager-Buff (Camp Benefits) am Namen erkennen
 local CAMP_AURA_PATTERNS = { "lagerfeuer", "campfire", "lager", "camp" }
-local CAMP_SPELL_PATTERNS = { "lagerfeuer", "campfire" }
-local CAMP_RANGE = 15         -- Meter um ein beobachtetes Feuer
-local CAMP_FIRE_LIFETIME = 1800 -- so lange gilt ein beobachtetes Feuer als vorhanden
+-- Buff "Campfire Nearby": nur damit werden Lagerobjekte vorgeschlagen
+local CAMP_NEARBY_SPELL = 1283391
+local CAMP_NEARBY_NAMES = { "Campfire Nearby", "Lagerfeuer in der Nähe" }
 
 ------------------------------------------------------------------------
 -- Hilfsfunktionen (alles defensiv: geheime Werte & fehlende APIs abfangen)
@@ -862,16 +862,6 @@ local function campSkill(obj, skills)
   return 0
 end
 
--- Beobachtete Lagerfeuer (eigene oder von Gruppenmitgliedern aufgestellt)
-local campFires = {}
-
-local function unitPos(unit)
-  if not UnitPosition then return nil end
-  local y, x, _, inst = safe(UnitPosition, unit)
-  if type(x) ~= "number" or type(y) ~= "number" then return nil end
-  return x, y, inst
-end
-
 local function matchesAny(text, patterns)
   if not text or isSecret(text) then return false end
   text = text:lower()
@@ -881,49 +871,18 @@ local function matchesAny(text, patterns)
   return false
 end
 
-local fireWatch = CreateFrame("Frame")
-pcall(fireWatch.RegisterEvent, fireWatch, "UNIT_SPELLCAST_SUCCEEDED")
-fireWatch:SetScript("OnEvent", function(_, _, unit, _, spellID)
-  if isSecret(spellID) or isSecret(unit) then return end
-  local name = spellID and safe(C_Spell.GetSpellName, spellID)
-  if not matchesAny(name, CAMP_SPELL_PATTERNS) then return end
-  local x, y, inst = unitPos(unit)
-  if not x then return end
-  table.insert(campFires, { x = x, y = y, inst = inst, t = GetTime() })
-  if ns.queueUpdate then ns.queueUpdate() end
-end)
-
--- Aura am Spieler, die nach Lagerfeuer aussieht (frisch oder ohne Laufzeit)
-local function campAura()
-  if not (C_UnitAuras and C_UnitAuras.GetAuraDataByIndex) then return nil end
-  for i = 1, 40 do
-    local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
-    if not ok or not aura then break end
-    if not isSecret(aura) and matchesAny(aura.name, CAMP_AURA_PATTERNS) then
-      local dur, exp = aura.duration, aura.expirationTime
-      if isSecret(dur) or isSecret(exp) then return aura.name end
-      -- Ohne Laufzeit = Gebiets-Aura des Feuers; sonst nur in den ersten 2 Min.
-      -- (der fertige Lager-Buff hält 1 Std. und wirkt auch fern vom Feuer)
-      if not dur or dur == 0 or (exp - dur) > GetTime() - 120 then return aura.name end
+-- Bist du an einem Lagerfeuer? Nur der Buff "Campfire Nearby" zählt; ohne ihn
+-- werden keine Lagerobjekte vorgeschlagen. Liefert eine Begründung (/bc lager).
+local function nearCampfire()
+  if C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID then
+    local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, CAMP_NEARBY_SPELL)
+    if ok and aura and not isSecret(aura) then
+      return true, L["Buff: %s"]:format(aura.name or "Campfire Nearby")
     end
   end
-  return nil
-end
-
--- Bist du an einem Lagerfeuer? Liefert eine Begründung (für /bc lager)
-local function nearCampfire()
-  local aura = campAura()
-  if aura then return true, L["Buff: %s"]:format(aura) end
-  local x, y, inst = unitPos("player")
-  local now = GetTime()
-  for i = #campFires, 1, -1 do
-    local f = campFires[i]
-    if now - f.t > CAMP_FIRE_LIFETIME then
-      table.remove(campFires, i)
-    elseif x and f.inst == inst then
-      local d = math.sqrt((x - f.x) ^ 2 + (y - f.y) ^ 2)
-      if d <= CAMP_RANGE then return true, L["Feuer in %d m"]:format(d) end
-    end
+  for _, n in ipairs(CAMP_NEARBY_NAMES) do
+    local active, rem = hasBuff(n) -- rem: Buff da, läuft nur bald ab
+    if active or rem then return true, L["Buff: %s"]:format(n) end
   end
   return false
 end

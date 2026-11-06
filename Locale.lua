@@ -178,7 +178,6 @@ local EN = {
   ["Ausdauer"] = "Stamina",
   ["8 % auf alle Werte"] = "8% to all stats",
   ["Buff: %s"] = "Buff: %s",
-  ["Feuer in %d m"] = "fire %d yd away",
   ["Bringt: %s"] = "Gives: %s",
   ["Wirkt nicht zusammen mit %s (aktiv)"] = "Doesn't stack with %s (active)",
   ["Weitere Möglichkeiten:"] = "Other options:",
