@@ -79,7 +79,9 @@ Chat commands:
 
 ## Installation
 
-Copy the `BuffCheck` folder to `World of Warcraft/_forever_/Interface/AddOns/` and reload the UI (`/reload`).
+**WowUp:** *Get Addons → Install from URL* → `https://github.com/nachtgold/buffcheck` (with *World of Warcraft: Forever* selected).
+
+**Manually:** download `BuffCheck-<version>-forever.zip` from the [latest release](https://github.com/nachtgold/buffcheck/releases/latest), or copy the `BuffCheck` folder to `World of Warcraft/_forever_/Interface/AddOns/` and reload the UI (`/reload`).
 
 ## Notes and limits
 
@@ -101,6 +103,10 @@ BuffCheck zeigt außerhalb des Kampfs, welche Selbst-Buffs dir fehlen: Klassenbu
 - **Lagerfeuer:** Am Feuer schlägt BuffCheck das Lagerobjekt vor, das du selbst aufstellen solltest, passend zu Rolle, Berufen und aktiven Klassenbuffs. Prüfen mit `/bc lager`.
 
 Einstellungen findest du unter **Optionen → AddOns → BuffCheck**, über den Minimap-Button oder mit `/bc`.
+
+## Releases
+
+Releases are built by `.github/workflows/release.yml`. Bump `## Version` in `BuffCheck.toc`, then either push a tag (`git tag v1.9 && git push origin v1.9`) or run the *Release* workflow manually in GitHub Actions. It publishes `BuffCheck-<version>-forever.zip` plus a `release.json`, which is what WowUp needs.
 
 ## License
 

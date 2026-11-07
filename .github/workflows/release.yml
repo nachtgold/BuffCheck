@@ -1,0 +1,87 @@
+name: Release
+
+# Builds the addon zip and publishes a GitHub release that WowUp can install.
+# WowUp ("Install from URL") needs a non-draft release with a zip asset whose
+# name ends in "-forever.zip" for WoW Forever, or a release.json (BigWigs
+# packager format) that maps flavor "forever" to the zip.
+#
+# Trigger: push a tag like "v1.9", or run the workflow manually
+# (then the version is read from BuffCheck.toc and the tag v<version> is created).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: meta
+        run: |
+          set -euo pipefail
+          TOC_VERSION=$(sed -n 's/^## Version:[[:space:]]*//p' BuffCheck.toc | tr -d '\r')
+          INTERFACE=$(sed -n 's/^## Interface:[[:space:]]*//p' BuffCheck.toc | tr -d '\r' | cut -d, -f1 | tr -d ' ')
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG="${GITHUB_REF_NAME}"
+            VERSION="${TAG#v}"
+          else
+            VERSION="${TOC_VERSION}"
+            TAG="v${VERSION}"
+          fi
+          if [ "${VERSION}" != "${TOC_VERSION}" ]; then
+            echo "::warning::Tag version ${VERSION} differs from BuffCheck.toc version ${TOC_VERSION}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "interface=${INTERFACE}" >> "$GITHUB_OUTPUT"
+          echo "zip=BuffCheck-${VERSION}-forever.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Build zip
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # Zip contains a top-level BuffCheck/ folder; files marked
+          # export-ignore in .gitattributes are left out.
+          git archive --format=zip --prefix=BuffCheck/ -o "dist/${{ steps.meta.outputs.zip }}" HEAD
+          unzip -l "dist/${{ steps.meta.outputs.zip }}"
+
+      - name: Write release.json
+        run: |
+          cat > dist/release.json <<JSON
+          {
+            "releases": [
+              {
+                "name": "BuffCheck",
+                "version": "${{ steps.meta.outputs.version }}",
+                "filename": "${{ steps.meta.outputs.zip }}",
+                "nolib": false,
+                "metadata": [
+                  { "flavor": "forever", "interface": ${{ steps.meta.outputs.interface }} }
+                ]
+              }
+            ]
+          }
+          JSON
+          cat dist/release.json
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.meta.outputs.tag }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* \
+              --target "${GITHUB_SHA}" \
+              --title "BuffCheck ${{ steps.meta.outputs.version }}" \
+              --generate-notes
+          fi
